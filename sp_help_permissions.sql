@@ -216,17 +216,17 @@ BEGIN TRANSACTION;
 	FETCH NEXT FROM logincur INTO @name;
 	WHILE (@@FETCH_STATUS=0) BEGIN;
 		
-        IF (@name!='NT AUTHORITY\Authenticated Users')
+        IF (@name NOT LIKE 'NT AUTHORITY\%')
 		    INSERT INTO @xp_logininfo
 		    EXECUTE sys.xp_logininfo @acctname=@name, @option='members';
 
         --- NT AUTHORITY\Authenticated Users really doesn't play nice with xp_logininfo:
-        IF (@name='NT AUTHORITY\Authenticated Users') BEGIN;
+        IF (@name LIKE 'NT AUTHORITY\%') BEGIN;
 		    INSERT INTO @xp_logininfo
 		    EXECUTE sys.xp_logininfo;
 
             UPDATE @xp_logininfo
-            SET permission_path='NT AUTHORITY\Authenticated Users'
+            SET permission_path=@name
             WHERE permission_path IS NULL;
         END;
 
@@ -342,7 +342,8 @@ WITH s_cte AS (
 		FROM @srv_members AS srm
 		INNER JOIN s_cte ON s_cte.effective_principal_id=srm.role_principal_id
 		INNER JOIN @srv_principals AS sp ON srm.member_principal_id=sp.principal_id
-        WHERE 'NT AUTHORITY\Authenticated Users' NOT IN (s_cte.declared_name, sp.[name])
+        WHERE s_cte.declared_name NOT LIKE 'NT AUTHORITY\%'
+          AND sp.[name] NOT LIKE 'NT AUTHORITY\%'
           AND s_cte.declared_principal_id!=sp.principal_id), -- vain attempt to stop infinite recursion
 
 	d_cte AS (
