@@ -3,23 +3,17 @@ GO
 IF (OBJECT_ID('dbo.sp_help_permissions') IS NULL) EXEC('CREATE PROCEDURE dbo.sp_help_permissions AS --');
 GO
 /*
-
 This script lists all permissions by principal, securable and permission.
 Optionally, you can filter these objects using the @principal, @securable,
 and/or @permission parameters (using T-SQL wildcards).
-
 The output can be tabular with permissions grouped as comma-separated lists
 (using @permission_list=1) or one row for each permission (@permission_list=0).
 You can also return the result as an xml OUTPUT variable, using @output_xml=1
 and collecting the output from the @xml parameter.
-
 Copyright Daniel Hutmacher under Creative Commons 4.0 license with attribution.
 http://creativecommons.org/licenses/by/4.0/
-
 Source: http://sqlsunday.com/downloads/
-
 VERSION: 2017-10-06
-
 DISCLAIMER: This script does not make any modifications to the database
             apart from installing and registering a stored procedure
         in the master database, but may still not be suitable to run in
@@ -30,7 +24,6 @@ DISCLAIMER: This script does not make any modifications to the database
         If your juristiction does not allow for this kind of
         waiver/disclaimer, or if you do not accept these terms, you are
 	    NOT allowed to store, distribute or use this code in any manner.
-
 */
 ALTER PROCEDURE dbo.sp_help_permissions
     @principal                  sysname=NULL,
@@ -64,9 +57,9 @@ DECLARE @xp_logininfo TABLE (
 	[type]					varchar(100) NULL,
 	privilege				varchar(100) NULL,
 	mapped_login_name		sysname NOT NULL,
-	permission_path			sysname NOT NULL,
+	permission_path			sysname NULL,
 	_id						int IDENTITY(1, 1) NOT NULL,
-	PRIMARY KEY CLUSTERED (permission_path, mapped_login_name)
+	PRIMARY KEY CLUSTERED (mapped_login_name, _id)
 );
 
 DECLARE @srv_principals TABLE (
@@ -212,14 +205,28 @@ WHERE [sid] IS NOT NULL AND (
 --- resolved using xp_logininfo:
 BEGIN TRANSACTION;
 
-	DECLARE logincur CURSOR LOCAL FOR SELECT [name] FROM @srv_principals WHERE [type_desc]=N'WINDOWS_GROUP';
+	DECLARE logincur CURSOR LOCAL FOR
+        SELECT [name]
+        FROM @srv_principals
+        WHERE [type_desc]=N'WINDOWS_GROUP'
 	OPEN logincur;
 
 	FETCH NEXT FROM logincur INTO @name;
 	WHILE (@@FETCH_STATUS=0) BEGIN;
 		
-		INSERT INTO @xp_logininfo
-		EXECUTE sys.xp_logininfo @acctname=@name, @option='members';
+        IF (@name!='NT AUTHORITY\Authenticated Users')
+		    INSERT INTO @xp_logininfo
+		    EXECUTE sys.xp_logininfo @acctname=@name, @option='members';
+
+        --- NT AUTHORITY\Authenticated Users really doesn't play nice with xp_logininfo:
+        IF (@name='NT AUTHORITY\Authenticated Users') BEGIN;
+		    INSERT INTO @xp_logininfo
+		    EXECUTE sys.xp_logininfo;
+
+            UPDATE @xp_logininfo
+            SET permission_path='NT AUTHORITY\Authenticated Users'
+            WHERE permission_path IS NULL;
+        END;
 
 		FETCH NEXT FROM logincur INTO @name;
 	END;
@@ -332,7 +339,8 @@ WITH s_cte AS (
 			   s_cte.[path]+' -> '+CAST((CASE WHEN sp.[name] IN ('sa') THEN N'"'+sp.[name]+N'"' ELSE LOWER(REPLACE(sp.[type_desc], N'_', N' ')) COLLATE database_default+N' "'+sp.[name]+N'"' END) AS nvarchar(max)) AS [path]
 		FROM @srv_members AS srm
 		INNER JOIN s_cte ON s_cte.effective_principal_id=srm.role_principal_id
-		INNER JOIN @srv_principals AS sp ON srm.member_principal_id=sp.principal_id),
+		INNER JOIN @srv_principals AS sp ON srm.member_principal_id=sp.principal_id
+        WHERE 'NT AUTHORITY\Authenticated Users' NOT IN (s_cte.declared_name, sp.[name])),
 
 	d_cte AS (
 		--- Database principals (anchor)
