@@ -67,7 +67,8 @@ DECLARE @srv_principals TABLE (
 	[type_desc]				nvarchar(60) NOT NULL,
 	[sid]					varbinary(85) NULL,
 	[name]					sysname NOT NULL,
-	PRIMARY KEY (principal_id)
+	PRIMARY KEY CLUSTERED (principal_id),
+    UNIQUE ([sid])
 );
 
 DECLARE @srv_members TABLE (
@@ -82,7 +83,8 @@ DECLARE @db_principals TABLE (
 	[sid]					varbinary(85) NOT NULL,
 	[name]					sysname NOT NULL,
     member_of               int NULL,
-	PRIMARY KEY (principal_id)
+	PRIMARY KEY (principal_id),
+    UNIQUE ([sid])
 );
 
 DECLARE @db_members TABLE (
@@ -271,7 +273,7 @@ WHERE dp.[sid] IS NOT NULL;			--- Don't include "INFORMATION_SCHEMA" and "sys"
 
 --- Implicit database principals inherited from their respective server principals:
 INSERT INTO @db_principals (principal_id, [type_desc], [sid], [name])
-SELECT wl.principal_id, N'WINDOWS_USER' AS [type_desc], wl.[sid], wl.[name]
+SELECT DISTINCT wl.principal_id, N'WINDOWS_USER' AS [type_desc], wl.[sid], wl.[name]
 FROM @srv_principals AS wg
 INNER JOIN @srv_members AS m ON wg.principal_id=m.role_principal_id AND m.member_principal_id<0
 INNER JOIN @srv_principals AS wl ON m.member_principal_id=wl.principal_id
@@ -340,7 +342,8 @@ WITH s_cte AS (
 		FROM @srv_members AS srm
 		INNER JOIN s_cte ON s_cte.effective_principal_id=srm.role_principal_id
 		INNER JOIN @srv_principals AS sp ON srm.member_principal_id=sp.principal_id
-        WHERE 'NT AUTHORITY\Authenticated Users' NOT IN (s_cte.declared_name, sp.[name])),
+        WHERE 'NT AUTHORITY\Authenticated Users' NOT IN (s_cte.declared_name, sp.[name])
+          AND s_cte.declared_principal_id!=sp.principal_id), -- vain attempt to stop infinite recursion
 
 	d_cte AS (
 		--- Database principals (anchor)
@@ -371,7 +374,8 @@ WITH s_cte AS (
 			   d_cte.[path]+' -> '+CAST((CASE WHEN dp.[name] IN ('dbo') THEN N'"'+dp.[name]+N'"' ELSE LOWER(REPLACE(dp.[type_desc], N'_', N' ')) COLLATE database_default+N' "'+dp.[name]+N'"' END) AS nvarchar(max)) AS [path]
 		FROM @db_members AS drm
 		INNER JOIN d_cte ON d_cte.effective_principal_id=drm.role_principal_id
-		INNER JOIN @db_principals AS dp ON drm.member_principal_id=dp.principal_id),
+		INNER JOIN @db_principals AS dp ON drm.member_principal_id=dp.principal_id
+        WHERE d_cte.declared_principal_id!=dp.principal_id), -- vain attempt to stop infinite recursion
 
 	cte AS (
 		--- Server principal hierarchy
