@@ -13,7 +13,7 @@ and collecting the output from the @xml parameter.
 Copyright Daniel Hutmacher under Creative Commons 4.0 license with attribution.
 http://creativecommons.org/licenses/by/4.0/
 Source: http://sqlsunday.com/downloads/
-VERSION: 2017-10-06
+VERSION: 2020-05-09
 DISCLAIMER: This script does not make any modifications to the database
             apart from installing and registering a stored procedure
         in the master database, but may still not be suitable to run in
@@ -544,6 +544,7 @@ WITH s(parent_class, parent_major_id, class, major_id, principal_id, class_desc,
     FROM sys.availability_groups AS ag
     INNER JOIN sys.availability_replicas agr on agr.group_id=ag.group_id
     INNER JOIN sys.dm_hadr_availability_replica_states AS agrs ON agrs.replica_id=agr.replica_id AND agrs.is_local=1
+    WHERE agr.replica_metadata_id IS NOT NULL   -- temporary workaround to fix NULL values in major_id (replica_metadata_id)
     UNION ALL
     -- ENDPOINT
     SELECT 100 AS parent_class, 0 AS parent_major_id, 105 AS class, endpoint_id AS major_id, NULL, 'ENDPOINT', N'ENDPOINT::'+QUOTENAME([name]), 1 AS is_server_lvl
