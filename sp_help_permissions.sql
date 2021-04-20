@@ -13,7 +13,7 @@ and collecting the output from the @xml parameter.
 Copyright Daniel Hutmacher under Creative Commons 4.0 license with attribution.
 http://creativecommons.org/licenses/by/4.0/
 Source: http://sqlsunday.com/downloads/
-VERSION: 2020-05-09
+VERSION: 2021-04-20
 DISCLAIMER: This script does not make any modifications to the database
             apart from installing and registering a stored procedure
         in the master database, but may still not be suitable to run in
@@ -161,11 +161,11 @@ DECLARE @securables_temp TABLE (
 DECLARE @securables TABLE (
     parent_class            int NOT NULL,
     parent_major_id         int NOT NULL,
-    parent_qualified_name   nvarchar(255) NULL,
+    parent_qualified_name   nvarchar(max) NULL,
     class                   int NOT NULL,
     class_desc              nvarchar(60) NOT NULL,
     major_id                int NOT NULL,
-    qualified_name          nvarchar(255) NULL,
+    qualified_name          nvarchar(max) NULL,
     principal_id            int NULL,
     is_server_lvl           bit NOT NULL,
     [path]                  nvarchar(max) NOT NULL,
@@ -622,7 +622,7 @@ WITH s(parent_class, parent_major_id, class, major_id, principal_id, class_desc,
     FROM sys.fulltext_catalogs
     UNION ALL
     -- FULLTEXT STOPLIST
-    SELECT 0 AS parent_class, 0 AS parent_major_id, 23 AS class, stoplist_id AS major_id, principal_id, 'FULLTEXT STOPLIST', N'STOPLIST::'+QUOTENAME([name]), 0 AS is_server_lvl
+    SELECT 0 AS parent_class, 0 AS parent_major_id, 29 AS class, stoplist_id AS major_id, principal_id, 'FULLTEXT STOPLIST', N'STOPLIST::'+QUOTENAME([name]), 0 AS is_server_lvl
     FROM sys.fulltext_stoplists
     UNION ALL
     -- SYMMETRIC KEY
