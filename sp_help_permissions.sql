@@ -13,7 +13,7 @@ and collecting the output from the @xml parameter.
 Copyright Daniel Hutmacher under Creative Commons 4.0 license with attribution.
 http://creativecommons.org/licenses/by/4.0/
 Source: http://sqlsunday.com/downloads/
-VERSION: 2021-04-20
+VERSION: 2021-05-08
 DISCLAIMER: This script does not make any modifications to the database
             apart from installing and registering a stored procedure
         in the master database, but may still not be suitable to run in
@@ -634,7 +634,7 @@ WITH s(parent_class, parent_major_id, class, major_id, principal_id, class_desc,
     FROM sys.certificates
     UNION ALL
     -- ASYMMETRIC_KEY
-    SELECT 0 AS parent_class, 0 AS parent_major_id, 26 AS class, asymmetric_key_id AS major_id, principal_id, 'CERTIFICATE', N'CERTIFICATE::'+QUOTENAME([name]), 0 AS is_server_lvl
+    SELECT 0 AS parent_class, 0 AS parent_major_id, 26 AS class, asymmetric_key_id AS major_id, principal_id, 'ASYMMETRIC_KEY', N'ASYMMETRIC_KEY::'+QUOTENAME([name]), 0 AS is_server_lvl
     FROM sys.asymmetric_keys)
 
 INSERT INTO @securables_temp (parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl)
