@@ -283,7 +283,7 @@ INNER JOIN @db_principals AS dp ON dp.[sid]=wg.[sid];
 INSERT INTO @db_principals (principal_id, [type_desc], [sid], [name], member_of)
 SELECT (SELECT MAX(principal_id) FROM @db_principals)+
        ROW_NUMBER() OVER (ORDER BY sp.principal_id) AS principal_id,
-       'USER', sp.[sid], sp.[name], dbo.principal_id
+       REPLACE(sp.[type_desc], N'_LOGIN', N'_USER'), sp.[sid], sp.[name], dbo.principal_id
 FROM @srv_principals AS sp
 LEFT JOIN @db_principals AS db ON sp.[sid]=db.[sid]
 INNER JOIN @db_principals AS dbo ON dbo.[name]=N'dbo'
