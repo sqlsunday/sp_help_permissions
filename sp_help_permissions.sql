@@ -13,7 +13,7 @@ and collecting the output from the @xml parameter.
 Copyright Daniel Hutmacher under Creative Commons 4.0 license with attribution.
 http://creativecommons.org/licenses/by/4.0/
 Source: http://sqlsunday.com/downloads/
-VERSION: 2021-05-08
+VERSION: 2022-05-02
 DISCLAIMER: This script does not make any modifications to the database
             apart from installing and registering a stored procedure
         in the master database, but may still not be suitable to run in
