@@ -1443,16 +1443,13 @@ IF (@output_xml=0)
 
         p.class=sec.class_desc
 
-   LEFT OUTER JOIN @tblSupportObject tblSO
+    LEFT OUTER JOIN @tblSupportObject tblSO
 
-        on   1 =1
-        
-        and  [sec].[class_desc] = 'OBJECT'
+        on   [sec].[class_desc] = 'OBJECT'
 
         and  [sec].[objectType] = tblSO.[type] 
 
-       and  p.permission = tblSO.[operation]
-
+        and   [p].[permission] = tblSO.[operation]
 
 
     WHERE (@principal IS NULL OR grantee.effective_name LIKE @principal) AND
