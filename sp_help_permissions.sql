@@ -25,7 +25,7 @@ DISCLAIMER: This script does not make any modifications to the database
         waiver/disclaimer, or if you do not accept these terms, you are
 	    NOT allowed to store, distribute or use this code in any manner.
 */
-ALTER PROCEDURE [dbo].[sp_help_permissions]
+ALTER PROCEDURE dbo.sp_help_permissions
     @principal                  sysname=NULL,
     @securable                  sysname=NULL,
     @permission                 sysname=NULL,
@@ -232,344 +232,6 @@ declare @tblSupportObject table
 
 )
 
-; with cteSupportObject
-(
-      [type]            
-
-    , [operation]       
-
-    , [allowed]       
-)
-as
-/*
-    Table
-*/
-(
-    select
-              'U'
-            , 'INSERT'
-            , 1
-
-    union all
-
-    select
-              'U'
-            , 'UPDATE'
-            , 1
-
-    union all
-
-    select
-              'U'
-            , 'DELETE'
-            , 1
-
-    union all
-
-    select
-              'U'
-            , 'SELECT'
-            , 1
-
-    union all
-
-    select
-
-              'U'
-            , 'EXECUTE'
-            , 0
-
-    /*
-        View
-    */
-    union all
-
-    select
-              'V'
-            , 'INSERT'
-            , 1
-
-    union all
-
-    select
-
-              'V'
-            , 'UPDATE'
-            , 1
-
-    union all
-
-    select
-              'V'
-            , 'DELETE'
-            , 1
-
-    union all
-
-    select 
-              'V'
-            , 'SELECT'
-            , 1
-
-    union all
-
-    select
-
-              'V'
-            , 'EXECUTE'
-            , 0
-
-
-    /*
-        Function - Inline Function
-    */
-    union all
-
-
-    select
-    
-              'FN'
-            , 'INSERT'
-            , 1
-    
-    union all
-
-    select
-    
-              'FN'
-            , 'UPDATE'
-            , 1
-    
-    union all
-
-    select    
-   
-              'FN'
-            , 'DELETE'
-            , 1
-
-    union all
-
-    select
-              'FN'
-            , 'SELECT'
-            , 1
-    
-    
-    union all
-
-    select
-    
-              'FN'
-            , 'EXECUTE'
-            , 0
-    
-    
-    /*
-        Function - Table Function
-    */
-    union all
-
-    select
-              'TF'
-            , 'INSERT'
-            , 1
-    
-    
-    union all
-
-    select
-              'TF'
-            , 'UPDATE'
-            , 1
-    
-    union all
-
-    select
-              'TF'
-            , 'DELETE'
-            , 1    
-
-    union all
-
-    select
-              'TF'
-            , 'SELECT'
-            , 1
-    
-    
-    union all
-
-    select
-              'TF'
-            , 'EXECUTE'
-            , 0
-    
-
-    /*
-        Function - Inline Function
-    */
-
-    union all
-
-    select
-              'IF'
-            , 'INSERT'
-            , 0
-
-    union all
-    
-    select
-    
-              'IF'
-            , 'UPDATE'
-            , 0
-    
-    
-    union all
-
-    select
-    
-              'IF'
-            , 'DELETE'
-            , 0
-    
-    union all
-
-    select
-              'IF'
-            , 'SELECT'
-            , 1
-    
-    
-    union all
-
-    select
-              'IF'
-            , 'EXECUTE'
-            , 0
-    
-    /*
-        Stored Procedure
-    */
-    union all
-    select
-              'P'
-            , 'INSERT'
-            , 0
-
-    union all
-
-    select
-              'P'
-            , 'UPDATE'
-            , 0
-
-    union all
-
-    select
-              'P'
-            , 'DELETE'
-            , 0
-
-    union all
-
-    select
-
-              'P'
-            , 'SELECT'
-            , 0
-
-
-    union all
-
-    select
-              'P'
-            , 'EXECUTE'
-            , 1
-
-    /*
-        Table Type
-    */
-    union all
-
-    select
-
-              'TT'
-            , 'INSERT'
-            , 0
-
-    union all
-
-    select
-              'TT'
-            , 'UPDATE'
-            , 0
-
-    union all
-
-    select
-              'TT'
-            , 'DELETE'
-            , 0
-
-    union all
-
-    select
-              'TT'
-            , 'SELECT'
-            , 0
-
-    union all
-
-    select
-              'TT'
-            , 'EXECUTE'
-            , 0
-
-
-
-    /*
-        SQ => SERVICE_QUEUE
-    */
-    union all
-
-    select
-              'SQ'
-            , 'INSERT'
-            , 0
-
-    union all
-
-    select
-              'SQ'
-            , 'UPDATE'
-            , 0
-
-    union all
-
-    select
-              'SQ'
-            , 'DELETE'
-            , 0
-
-    union all
-
-    select
-              'SQ'
-            , 'SELECT'
-            , 0
-
-    union all
-
-
-    select
-              'SQ'
-            , 'EXECUTE'
-            , 0
-)
-
-
 insert into @tblSupportObject 
 (
 
@@ -579,16 +241,273 @@ insert into @tblSupportObject
 
     , [allowed]         
 )
-select
+values
+/*
+    Table
+*/
+(
+          'U'
+        , 'INSERT'
+        , 1
+)
+,
+(
+          'U'
+        , 'UPDATE'
+        , 1
+)
+,
+(
+          'U'
+        , 'DELETE'
+        , 1
+)
+,
+(
+          'U'
+        , 'SELECT'
+        , 1
+)
+,
+(
+          'U'
+        , 'EXECUTE'
+        , 0
+)
+/*
+    View
+*/
+,
+(
+          'V'
+        , 'INSERT'
+        , 1
+)
+,
+(
+          'V'
+        , 'UPDATE'
+        , 1
+)
+,
+(
+          'V'
+        , 'DELETE'
+        , 1
+)
+,
+(
+          'V'
+        , 'SELECT'
+        , 1
+)
+,
+(
+          'V'
+        , 'EXECUTE'
+        , 0
+)
+/*
+    Function - Scalar Function
+*/
+,
+(
+          'FN'
+        , 'INSERT'
+        , 0
+)
+,
+(
+          'FN'
+        , 'UPDATE'
+        , 0
+)
+,
+(
+          'FN'
+        , 'DELETE'
+        , 0
+)
+,
+(
+          'FN'
+        , 'SELECT'
+        , 0
+)
+,
+(
+          'FN'
+        , 'EXECUTE'
+        , 1
+)
+,
+/*
+    Function - Table Function
+*/
+(
+          'TF'
+        , 'INSERT'
+        , 0
+)
+,(
+          'TF'
+        , 'UPDATE'
+        , 0
+)
+,
+(
+          'TF'
+        , 'DELETE'
+        , 0
+)
+,
+(
+          'TF'
+        , 'SELECT'
+        , 1
+)
+,
+(
+          'TF'
+        , 'EXECUTE'
+        , 0
+)
+
+/*
+    Function - Inline Function
+*/
+,
+(
+          'IF'
+        , 'INSERT'
+        , 0
+)
+,
+(
+          'IF'
+        , 'UPDATE'
+        , 0
+)
+,
+(
+          'IF'
+        , 'DELETE'
+        , 0
+)
+,
+(
+          'IF'
+        , 'SELECT'
+        , 1
+)
+,
+(
+          'IF'
+        , 'EXECUTE'
+        , 0
+)
+/*
+    Stored Procedure
+*/
+,
+(
+          'P'
+        , 'INSERT'
+        , 0
+)
+,
+(
+          'P'
+        , 'UPDATE'
+        , 0
+)
+,
+(
+          'P'
+        , 'DELETE'
+        , 0
+)
+,
+(
+          'P'
+        , 'SELECT'
+        , 0
+)
+,
+(
+          'P'
+        , 'EXECUTE'
+        , 1
+)
+
+/*
+    Table Type
+*/
+,
+(
+          'TT'
+        , 'INSERT'
+        , 0
+)
+,
+(
+          'TT'
+        , 'UPDATE'
+        , 0
+)
+,
+(
+          'TT'
+        , 'DELETE'
+        , 0
+)
+,
+(
+          'TT'
+        , 'SELECT'
+        , 0
+)
+,
+(
+          'TT'
+        , 'EXECUTE'
+        , 0
+)
 
 
-      [type]            
-
-    , [operation]       
-
-    , [allowed]   
-
-from cteSupportObject cteSO
+/*
+    SQ => SERVICE_QUEUE
+*/
+,
+(
+          'SQ'
+        , 'INSERT'
+        , 0
+)
+,
+(
+          'SQ'
+        , 'UPDATE'
+        , 0
+)
+,
+(
+          'SQ'
+        , 'DELETE'
+        , 0
+)
+,
+(
+          'SQ'
+        , 'SELECT'
+        , 0
+)
+,
+(
+          'SQ'
+        , 'EXECUTE'
+        , 0
+)
 
 -------------------------------------------------------------------------------
 --- PRINCIPALS
@@ -1406,6 +1325,8 @@ IF (@output_xml=0)
            sec.[path] AS securable_path,
            grantee.[path] AS principal_path,
 
+           /* Added by dadeniji 2023-03-12 -- Begin */
+
            [objectType] = [sec].[objectType],
 
            [objectTypeDescription] = [sec].[objectTypeDescription],
@@ -1416,6 +1337,8 @@ IF (@output_xml=0)
 
            tblSO.[allowed]   
            
+           /* Added by dadeniji 2023-03-12 -- End */
+
     FROM @rules AS perms
 
     INNER JOIN @principals AS grantee ON
@@ -1443,14 +1366,16 @@ IF (@output_xml=0)
 
         p.class=sec.class_desc
 
-    LEFT OUTER JOIN @tblSupportObject tblSO
+   /*
+        dadeniji 2023-03-12 04:02 PM
+   */
+   LEFT OUTER JOIN @tblSupportObject tblSO
 
-        on   [sec].[class_desc] = 'OBJECT'
+        on   1 =1
+        
+        and  [sec].[class_desc] = 'OBJECT'
 
         and  [sec].[objectType] = tblSO.[type] 
-
-        and   [p].[permission] = tblSO.[operation]
-
 
     WHERE (@principal IS NULL OR grantee.effective_name LIKE @principal) AND
           (@securable IS NULL OR sec.qualified_name LIKE @securable) AND
@@ -1484,5 +1409,5 @@ GO
 ---       feature of SQL Server.
 
 IF (DB_NAME()='master' AND CAST(SERVERPROPERTY('Edition') AS varchar(100)) NOT LIKE '%Azure%')
-	EXECUTE sys.sp_MS_marksystemobject @objname=N'sp_help_permissions';
+	EXECUTE sys.sp_MS_marksystemobject @objname=N'sp_help_permissions_revised';
 GO
