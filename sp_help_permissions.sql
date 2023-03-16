@@ -25,7 +25,7 @@ DISCLAIMER: This script does not make any modifications to the database
         waiver/disclaimer, or if you do not accept these terms, you are
 	    NOT allowed to store, distribute or use this code in any manner.
 */
-ALTER PROCEDURE dbo.sp_help_permissions
+ALTER PROCEDURE [dbo].[sp_help_permissions]
     @principal                  sysname=NULL,
     @securable                  sysname=NULL,
     @permission                 sysname=NULL,
@@ -232,6 +232,53 @@ declare @tblSupportObject table
 
 )
 
+declare @SECURABLE_CLASS_ENDPOINT sysname
+declare @SECURABLE_CLASS_SCHEMA   sysname
+declare @SECURABLE_CLASS_OBJECT   sysname
+
+declare @OBJECT_TYPE_TABLE              varchar(2)
+declare @OBJECT_TYPE_VIEW               varchar(2)
+declare @OBJECT_TYPE_STORED_PROCEDURE   varchar(2)
+declare @OBJECT_TYPE_SCALAR_FUNCTION    varchar(2)
+declare @OBJECT_TYPE_TABLE_FUNCTION     varchar(2)
+declare @OBJECT_TYPE_INLINE_FUNCTION    varchar(2)
+declare @OBJECT_USER_DEFINED_TABLE_TYPES varchar(2)
+declare @OBJECT_TYPE_SERVICE_QUEUE       varchar(2)
+
+declare @OPERATION_SELECT         varchar(30)
+declare @OPERATION_INSERT         varchar(30)
+declare @OPERATION_UPDATE         varchar(30)
+declare @OPERATION_DELETE         varchar(30)
+declare @OPERATION_EXECUTE        varchar(30)
+
+declare @VALUE_ALLOWED            bit
+
+set @SECURABLE_CLASS_ENDPOINT = 'ENDPOINT';
+set @SECURABLE_CLASS_OBJECT   = 'OBJECT';
+set @SECURABLE_CLASS_SCHEMA   = 'SCHEMA';
+
+set @OBJECT_TYPE_TABLE                = 'U';
+set @OBJECT_TYPE_VIEW                 = 'V';
+set @OBJECT_TYPE_STORED_PROCEDURE     = 'P';
+set @OBJECT_TYPE_SCALAR_FUNCTION      = 'FN'
+--Table Function => 'TF'
+set @OBJECT_TYPE_TABLE_FUNCTION      = 'TF'
+--Inline Function => 'IF'
+set @OBJECT_TYPE_INLINE_FUNCTION     = 'IF'
+
+set @OBJECT_USER_DEFINED_TABLE_TYPES = 'TT';
+
+set @OBJECT_TYPE_SERVICE_QUEUE = 'SQ';
+
+set @OPERATION_SELECT         = 'SELECT';
+set @OPERATION_INSERT         = 'INSERT';
+set @OPERATION_UPDATE         = 'UPDATE';
+set @OPERATION_DELETE         = 'DELETE';
+set @OPERATION_EXECUTE        = 'EXECUTE';
+
+set @VALUE_ALLOWED = 1;
+
+
 insert into @tblSupportObject 
 (
 
@@ -246,32 +293,32 @@ values
     Table
 */
 (
-          'U'
-        , 'INSERT'
+          @OBJECT_TYPE_TABLE
+        , @OPERATION_INSERT
         , 1
 )
 ,
 (
-          'U'
-        , 'UPDATE'
+           @OBJECT_TYPE_TABLE
+        , @OPERATION_UPDATE
         , 1
 )
 ,
 (
-          'U'
-        , 'DELETE'
+           @OBJECT_TYPE_TABLE
+        , @OPERATION_DELETE
         , 1
 )
 ,
 (
-          'U'
-        , 'SELECT'
+           @OBJECT_TYPE_TABLE
+        , @OPERATION_SELECT
         , 1
 )
 ,
 (
-          'U'
-        , 'EXECUTE'
+          @OBJECT_TYPE_TABLE
+        , @OPERATION_EXECUTE
         , 0
 )
 /*
@@ -279,32 +326,32 @@ values
 */
 ,
 (
-          'V'
-        , 'INSERT'
+          @OBJECT_TYPE_VIEW
+        , @OPERATION_INSERT
         , 1
 )
 ,
 (
-          'V'
-        , 'UPDATE'
+          @OBJECT_TYPE_VIEW
+        , @OPERATION_UPDATE
         , 1
 )
 ,
 (
-          'V'
-        , 'DELETE'
+          @OBJECT_TYPE_VIEW
+        , @OPERATION_DELETE
         , 1
 )
 ,
 (
-          'V'
-        , 'SELECT'
+          @OBJECT_TYPE_VIEW
+        , @OPERATION_SELECT
         , 1
 )
 ,
 (
-          'V'
-        , 'EXECUTE'
+          @OBJECT_TYPE_VIEW
+        , @OPERATION_EXECUTE
         , 0
 )
 /*
@@ -312,64 +359,64 @@ values
 */
 ,
 (
-          'FN'
-        , 'INSERT'
+          @OBJECT_TYPE_SCALAR_FUNCTION
+        , @OPERATION_INSERT
         , 0
 )
 ,
 (
-          'FN'
-        , 'UPDATE'
+          @OBJECT_TYPE_SCALAR_FUNCTION
+        , @OPERATION_UPDATE
         , 0
 )
 ,
 (
-          'FN'
-        , 'DELETE'
+          @OBJECT_TYPE_SCALAR_FUNCTION
+        , @OPERATION_DELETE
         , 0
 )
 ,
 (
-          'FN'
-        , 'SELECT'
+          @OBJECT_TYPE_SCALAR_FUNCTION
+        , @OPERATION_SELECT
         , 0
 )
 ,
 (
-          'FN'
-        , 'EXECUTE'
+          @OBJECT_TYPE_SCALAR_FUNCTION
+        , @OPERATION_EXECUTE
         , 1
 )
 ,
 /*
-    Function - Table Function
+    Function - Table Function => 'TF'
 */
 (
-          'TF'
-        , 'INSERT'
+          @OBJECT_TYPE_TABLE_FUNCTION
+        , @OPERATION_INSERT
         , 0
 )
 ,(
-          'TF'
-        , 'UPDATE'
+          @OBJECT_TYPE_TABLE_FUNCTION
+        , @OPERATION_UPDATE
         , 0
 )
 ,
 (
-          'TF'
-        , 'DELETE'
+          @OBJECT_TYPE_TABLE_FUNCTION
+        , @OPERATION_DELETE
         , 0
 )
 ,
 (
-          'TF'
-        , 'SELECT'
+          @OBJECT_TYPE_TABLE_FUNCTION
+        , @OPERATION_SELECT
         , 1
 )
 ,
 (
-          'TF'
-        , 'EXECUTE'
+          @OBJECT_TYPE_TABLE_FUNCTION
+        , @OPERATION_EXECUTE
         , 0
 )
 
@@ -378,32 +425,32 @@ values
 */
 ,
 (
-          'IF'
-        , 'INSERT'
+          @OBJECT_TYPE_INLINE_FUNCTION
+        , @OPERATION_INSERT
         , 0
 )
 ,
 (
-          'IF'
-        , 'UPDATE'
+          @OBJECT_TYPE_INLINE_FUNCTION
+        , @OPERATION_UPDATE
         , 0
 )
 ,
 (
-          'IF'
-        , 'DELETE'
+          @OBJECT_TYPE_INLINE_FUNCTION
+        , @OPERATION_DELETE
         , 0
 )
 ,
 (
-          'IF'
-        , 'SELECT'
+          @OBJECT_TYPE_INLINE_FUNCTION
+        , @OPERATION_SELECT
         , 1
 )
 ,
 (
-          'IF'
-        , 'EXECUTE'
+          @OBJECT_TYPE_INLINE_FUNCTION
+        , @OPERATION_EXECUTE
         , 0
 )
 /*
@@ -411,66 +458,66 @@ values
 */
 ,
 (
-          'P'
-        , 'INSERT'
+          @OBJECT_TYPE_STORED_PROCEDURE
+        , @OPERATION_INSERT
         , 0
 )
 ,
 (
-          'P'
-        , 'UPDATE'
+          @OBJECT_TYPE_STORED_PROCEDURE
+        , @OPERATION_UPDATE
         , 0
 )
 ,
 (
-          'P'
-        , 'DELETE'
+          @OBJECT_TYPE_STORED_PROCEDURE
+        , @OPERATION_DELETE
         , 0
 )
 ,
 (
-          'P'
-        , 'SELECT'
+          @OBJECT_TYPE_STORED_PROCEDURE
+        , @OPERATION_SELECT
         , 0
 )
 ,
 (
-          'P'
-        , 'EXECUTE'
+          @OBJECT_TYPE_STORED_PROCEDURE
+        , @OPERATION_EXECUTE
         , 1
 )
 
 /*
-    Table Type
+    User Defined Table Type => 'TT'
 */
 ,
 (
-          'TT'
-        , 'INSERT'
+          @OBJECT_USER_DEFINED_TABLE_TYPES
+        , @OPERATION_INSERT
         , 0
 )
 ,
 (
-          'TT'
-        , 'UPDATE'
+          @OBJECT_USER_DEFINED_TABLE_TYPES
+        , @OPERATION_UPDATE
         , 0
 )
 ,
 (
-          'TT'
-        , 'DELETE'
+          @OBJECT_USER_DEFINED_TABLE_TYPES
+        , @OPERATION_DELETE
         , 0
 )
 ,
 (
-          'TT'
-        , 'SELECT'
+          @OBJECT_USER_DEFINED_TABLE_TYPES
+        , @OPERATION_SELECT
         , 0
 )
 ,
 (
-          'TT'
-        , 'EXECUTE'
+          @OBJECT_USER_DEFINED_TABLE_TYPES
+        , @OPERATION_EXECUTE
         , 0
 )
 
@@ -480,32 +527,32 @@ values
 */
 ,
 (
-          'SQ'
-        , 'INSERT'
+          @OBJECT_TYPE_SERVICE_QUEUE
+        , @OPERATION_INSERT
         , 0
 )
 ,
 (
-          'SQ'
-        , 'UPDATE'
+          @OBJECT_TYPE_SERVICE_QUEUE
+        , @OPERATION_UPDATE
         , 0
 )
 ,
 (
-          'SQ'
-        , 'DELETE'
+          @OBJECT_TYPE_SERVICE_QUEUE
+        , @OPERATION_DELETE
         , 0
 )
 ,
 (
-          'SQ'
-        , 'SELECT'
+          @OBJECT_TYPE_SERVICE_QUEUE
+        , @OPERATION_SELECT
         , 0
 )
 ,
 (
-          'SQ'
-        , 'EXECUTE'
+          @OBJECT_TYPE_SERVICE_QUEUE
+        , @OPERATION_EXECUTE
         , 0
 )
 
@@ -913,8 +960,8 @@ AS (
     UNION ALL
     -- SCHEMA
     SELECT 0 AS parent_class, 0 AS parent_major_id, 3 AS class, [schema_id] AS major_id, principal_id, 'SCHEMA' AS class_desc, N'SCHEMA::'+QUOTENAME([name]), 0 AS is_server_lvl
-        ,  [objectType] = 'sys.schemas'
-        ,  [objectTypeDescription] = 'sys.schemas'
+        ,  [objectType] = @SECURABLE_CLASS_SCHEMA
+        ,  [objectTypeDescription] = @SECURABLE_CLASS_SCHEMA
     FROM sys.schemas
     UNION ALL
     --- OBJECT
@@ -1168,16 +1215,16 @@ INNER JOIN sys.fn_builtin_permissions('DATABASE') AS p ON
       p.[permission_name] IN ('BACKUP DATABASE', 'BACKUP LOG', 'CHECKPOINT') OR
 
       dp.[name]='db_datareader' AND s.[state]='G' AND
-      p.[permission_name]='SELECT' OR
+      p.[permission_name]=@OPERATION_SELECT OR
 
       dp.[name]='db_datawriter' AND s.[state]='G' AND
-      p.[permission_name] IN ('INSERT', 'DELETE', 'UPDATE') OR
+      p.[permission_name] IN ('INSERT', @OPERATION_DELETE, @OPERATION_UPDATE) OR
 
       dp.[name]='db_denydatareader' AND s.[state]='D' AND
-      p.[permission_name]='SELECT' OR
+      p.[permission_name]=@OPERATION_SELECT OR
 
       dp.[name]='db_denydatawriter' AND s.[state]='D' AND
-      p.[permission_name] IN ('INSERT', 'DELETE', 'UPDATE') OR
+      p.[permission_name] IN ('INSERT', @OPERATION_DELETE, @OPERATION_UPDATE) OR
 
       dp.[name]='db_ddladmin' AND s.[state]='G' AND
       p.[permission_name] IN ('ALTER ANY ASSEMBLY', 'ALTER ANY ASYMMETRIC KEY',
@@ -1331,11 +1378,37 @@ IF (@output_xml=0)
 
            [objectTypeDescription] = [sec].[objectTypeDescription],
            
-           tblSO.[type], 
+           [objectType]
+            = tblSO.[type], 
            
-           tblSO.[operation],
+           [objectOperation]
+            = tblSO.[operation],
 
-           tblSO.[allowed]   
+           [allowed]
+              = case 
+
+                    when ( sec.class_desc in
+
+                            (
+
+                                  @SECURABLE_CLASS_ENDPOINT
+                                
+                                , @SECURABLE_CLASS_SCHEMA 
+
+
+                            )
+
+                        )
+
+                        then @VALUE_ALLOWED
+
+                    when ( sec.class_desc = @SECURABLE_CLASS_OBJECT )
+
+                        then tblSO.[allowed]
+
+                end,
+
+           sec.class_desc
            
            /* Added by dadeniji 2023-03-12 -- End */
 
@@ -1376,6 +1449,9 @@ IF (@output_xml=0)
         and  [sec].[class_desc] = 'OBJECT'
 
         and  [sec].[objectType] = tblSO.[type] 
+        
+        and   [p].[permission] = tblSO.[operation]
+
 
     WHERE (@principal IS NULL OR grantee.effective_name LIKE @principal) AND
           (@securable IS NULL OR sec.qualified_name LIKE @securable) AND
@@ -1394,7 +1470,6 @@ IF (@output_xml=0)
              grantee.effective_name;
 
 
-
 GO
 
 
@@ -1409,5 +1484,5 @@ GO
 ---       feature of SQL Server.
 
 IF (DB_NAME()='master' AND CAST(SERVERPROPERTY('Edition') AS varchar(100)) NOT LIKE '%Azure%')
-	EXECUTE sys.sp_MS_marksystemobject @objname=N'sp_help_permissions_revised';
+	EXECUTE sys.sp_MS_marksystemobject @objname=N'[dbo].[sp_help_permissions]';
 GO
