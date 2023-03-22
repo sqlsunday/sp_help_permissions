@@ -1,6 +1,6 @@
 USE master;
 GO
-IF (OBJECT_ID('[dbo].[sp_help_permissions]') IS NULL) EXEC('CREATE PROCEDURE [dbo].[sp_help_permissions] AS --');
+IF (OBJECT_ID('dbo.sp_help_permissions') IS NULL) EXEC('CREATE PROCEDURE dbo.sp_help_permissions AS --');
 GO
 /*
 This script lists all permissions by principal, securable and permission.
@@ -13,7 +13,8 @@ and collecting the output from the @xml parameter.
 Copyright Daniel Hutmacher under Creative Commons 4.0 license with attribution.
 http://creativecommons.org/licenses/by/4.0/
 Source: http://sqlsunday.com/downloads/
-VERSION: 2022-05-02
+
+VERSION: 2023-03-22
 DISCLAIMER: This script does not make any modifications to the database
             apart from installing and registering a stored procedure
         in the master database, but may still not be suitable to run in
@@ -25,7 +26,7 @@ DISCLAIMER: This script does not make any modifications to the database
         waiver/disclaimer, or if you do not accept these terms, you are
 	    NOT allowed to store, distribute or use this code in any manner.
 */
-ALTER PROCEDURE [dbo].[sp_help_permissions]
+ALTER PROCEDURE dbo.sp_help_permissions
     @principal                  sysname=NULL,
     @securable                  sysname=NULL,
     @permission                 sysname=NULL,
@@ -215,346 +216,22 @@ DECLARE @rules TABLE (
             d) update
 
 */
-declare @tblSupportObject table
-(
+DECLARE @tblSupportObject TABLE (
+    [type]          char(2) NOT NULL,
+    [operation]     sysname NOT NULL,
+    [allowed]       bit NOT NULL,
+    PRIMARY KEY CLUSTERED ([type], [operation])
+);
 
-      [type]            char(2)     not null
-      
-    , [operation]       sysname     not null
-
-    , [allowed]         bit         not null
-
-    , primary key
-        (
-              [type]
-            , [operation]
-        )
-
-)
-
-declare @SECURABLE_CLASS_ENDPOINT sysname
-declare @SECURABLE_CLASS_SCHEMA   sysname
-declare @SECURABLE_CLASS_OBJECT   sysname
-
-declare @OBJECT_TYPE_TABLE              varchar(2)
-declare @OBJECT_TYPE_VIEW               varchar(2)
-declare @OBJECT_TYPE_STORED_PROCEDURE   varchar(2)
-declare @OBJECT_TYPE_SCALAR_FUNCTION    varchar(2)
-declare @OBJECT_TYPE_TABLE_FUNCTION     varchar(2)
-declare @OBJECT_TYPE_INLINE_FUNCTION    varchar(2)
-declare @OBJECT_USER_DEFINED_TABLE_TYPES varchar(2)
-declare @OBJECT_TYPE_SERVICE_QUEUE       varchar(2)
-
-declare @OPERATION_SELECT         varchar(30)
-declare @OPERATION_INSERT         varchar(30)
-declare @OPERATION_UPDATE         varchar(30)
-declare @OPERATION_DELETE         varchar(30)
-declare @OPERATION_EXECUTE        varchar(30)
-
-declare @VALUE_ALLOWED            bit
-
-set @SECURABLE_CLASS_ENDPOINT = 'ENDPOINT';
-set @SECURABLE_CLASS_OBJECT   = 'OBJECT';
-set @SECURABLE_CLASS_SCHEMA   = 'SCHEMA';
-
-set @OBJECT_TYPE_TABLE                = 'U';
-set @OBJECT_TYPE_VIEW                 = 'V';
-set @OBJECT_TYPE_STORED_PROCEDURE     = 'P';
-set @OBJECT_TYPE_SCALAR_FUNCTION      = 'FN'
---Table Function => 'TF'
-set @OBJECT_TYPE_TABLE_FUNCTION      = 'TF'
---Inline Function => 'IF'
-set @OBJECT_TYPE_INLINE_FUNCTION     = 'IF'
-
-set @OBJECT_USER_DEFINED_TABLE_TYPES = 'TT';
-
-set @OBJECT_TYPE_SERVICE_QUEUE = 'SQ';
-
-set @OPERATION_SELECT         = 'SELECT';
-set @OPERATION_INSERT         = 'INSERT';
-set @OPERATION_UPDATE         = 'UPDATE';
-set @OPERATION_DELETE         = 'DELETE';
-set @OPERATION_EXECUTE        = 'EXECUTE';
-
-set @VALUE_ALLOWED = 1;
-
-
-insert into @tblSupportObject 
-(
-
-      [type]            
-
-    , [operation]       
-
-    , [allowed]         
-)
-values
-/*
-    Table
-*/
-(
-          @OBJECT_TYPE_TABLE
-        , @OPERATION_INSERT
-        , 1
-)
-,
-(
-           @OBJECT_TYPE_TABLE
-        , @OPERATION_UPDATE
-        , 1
-)
-,
-(
-           @OBJECT_TYPE_TABLE
-        , @OPERATION_DELETE
-        , 1
-)
-,
-(
-           @OBJECT_TYPE_TABLE
-        , @OPERATION_SELECT
-        , 1
-)
-,
-(
-          @OBJECT_TYPE_TABLE
-        , @OPERATION_EXECUTE
-        , 0
-)
-/*
-    View
-*/
-,
-(
-          @OBJECT_TYPE_VIEW
-        , @OPERATION_INSERT
-        , 1
-)
-,
-(
-          @OBJECT_TYPE_VIEW
-        , @OPERATION_UPDATE
-        , 1
-)
-,
-(
-          @OBJECT_TYPE_VIEW
-        , @OPERATION_DELETE
-        , 1
-)
-,
-(
-          @OBJECT_TYPE_VIEW
-        , @OPERATION_SELECT
-        , 1
-)
-,
-(
-          @OBJECT_TYPE_VIEW
-        , @OPERATION_EXECUTE
-        , 0
-)
-/*
-    Function - Scalar Function
-*/
-,
-(
-          @OBJECT_TYPE_SCALAR_FUNCTION
-        , @OPERATION_INSERT
-        , 0
-)
-,
-(
-          @OBJECT_TYPE_SCALAR_FUNCTION
-        , @OPERATION_UPDATE
-        , 0
-)
-,
-(
-          @OBJECT_TYPE_SCALAR_FUNCTION
-        , @OPERATION_DELETE
-        , 0
-)
-,
-(
-          @OBJECT_TYPE_SCALAR_FUNCTION
-        , @OPERATION_SELECT
-        , 0
-)
-,
-(
-          @OBJECT_TYPE_SCALAR_FUNCTION
-        , @OPERATION_EXECUTE
-        , 1
-)
-,
-/*
-    Function - Table Function => 'TF'
-*/
-(
-          @OBJECT_TYPE_TABLE_FUNCTION
-        , @OPERATION_INSERT
-        , 0
-)
-,(
-          @OBJECT_TYPE_TABLE_FUNCTION
-        , @OPERATION_UPDATE
-        , 0
-)
-,
-(
-          @OBJECT_TYPE_TABLE_FUNCTION
-        , @OPERATION_DELETE
-        , 0
-)
-,
-(
-          @OBJECT_TYPE_TABLE_FUNCTION
-        , @OPERATION_SELECT
-        , 1
-)
-,
-(
-          @OBJECT_TYPE_TABLE_FUNCTION
-        , @OPERATION_EXECUTE
-        , 0
-)
-
-/*
-    Function - Inline Function
-*/
-,
-(
-          @OBJECT_TYPE_INLINE_FUNCTION
-        , @OPERATION_INSERT
-        , 0
-)
-,
-(
-          @OBJECT_TYPE_INLINE_FUNCTION
-        , @OPERATION_UPDATE
-        , 0
-)
-,
-(
-          @OBJECT_TYPE_INLINE_FUNCTION
-        , @OPERATION_DELETE
-        , 0
-)
-,
-(
-          @OBJECT_TYPE_INLINE_FUNCTION
-        , @OPERATION_SELECT
-        , 1
-)
-,
-(
-          @OBJECT_TYPE_INLINE_FUNCTION
-        , @OPERATION_EXECUTE
-        , 0
-)
-/*
-    Stored Procedure
-*/
-,
-(
-          @OBJECT_TYPE_STORED_PROCEDURE
-        , @OPERATION_INSERT
-        , 0
-)
-,
-(
-          @OBJECT_TYPE_STORED_PROCEDURE
-        , @OPERATION_UPDATE
-        , 0
-)
-,
-(
-          @OBJECT_TYPE_STORED_PROCEDURE
-        , @OPERATION_DELETE
-        , 0
-)
-,
-(
-          @OBJECT_TYPE_STORED_PROCEDURE
-        , @OPERATION_SELECT
-        , 0
-)
-,
-(
-          @OBJECT_TYPE_STORED_PROCEDURE
-        , @OPERATION_EXECUTE
-        , 1
-)
-
-/*
-    User Defined Table Type => 'TT'
-*/
-,
-(
-          @OBJECT_USER_DEFINED_TABLE_TYPES
-        , @OPERATION_INSERT
-        , 0
-)
-,
-(
-          @OBJECT_USER_DEFINED_TABLE_TYPES
-        , @OPERATION_UPDATE
-        , 0
-)
-,
-(
-          @OBJECT_USER_DEFINED_TABLE_TYPES
-        , @OPERATION_DELETE
-        , 0
-)
-,
-(
-          @OBJECT_USER_DEFINED_TABLE_TYPES
-        , @OPERATION_SELECT
-        , 0
-)
-,
-(
-          @OBJECT_USER_DEFINED_TABLE_TYPES
-        , @OPERATION_EXECUTE
-        , 0
-)
-
-
-/*
-    SQ => SERVICE_QUEUE
-*/
-,
-(
-          @OBJECT_TYPE_SERVICE_QUEUE
-        , @OPERATION_INSERT
-        , 0
-)
-,
-(
-          @OBJECT_TYPE_SERVICE_QUEUE
-        , @OPERATION_UPDATE
-        , 0
-)
-,
-(
-          @OBJECT_TYPE_SERVICE_QUEUE
-        , @OPERATION_DELETE
-        , 0
-)
-,
-(
-          @OBJECT_TYPE_SERVICE_QUEUE
-        , @OPERATION_SELECT
-        , 0
-)
-,
-(
-          @OBJECT_TYPE_SERVICE_QUEUE
-        , @OPERATION_EXECUTE
-        , 0
-)
+INSERT INTO @tblSupportObject ([type], [operation], [allowed])
+VALUES ('U',  'INSERT', 1), ('U',  'UPDATE', 1), ('U',  'DELETE', 1), ('U',  'SELECT', 1), ('U',  'EXECUTE', 0),
+       ('V',  'INSERT', 1), ('V',  'UPDATE', 1), ('V',  'DELETE', 1), ('V',  'SELECT', 1), ('V',  'EXECUTE', 0),
+       ('FN', 'INSERT', 0), ('FN', 'UPDATE', 0), ('FN', 'DELETE', 0), ('FN', 'SELECT', 0), ('FN', 'EXECUTE', 1),
+       ('TF', 'INSERT', 0), ('TF', 'UPDATE', 0), ('TF', 'DELETE', 0), ('TF', 'SELECT', 1), ('TF', 'EXECUTE', 0),
+       ('IF', 'INSERT', 0), ('IF', 'UPDATE', 0), ('IF', 'DELETE', 0), ('IF', 'SELECT', 1), ('IF', 'EXECUTE', 0),
+       ('P',  'INSERT', 0), ('P',  'UPDATE', 0), ('P',  'DELETE', 0), ('P',  'SELECT', 0), ('P',  'EXECUTE', 1),
+       ('TT', 'INSERT', 0), ('TT', 'UPDATE', 0), ('TT', 'DELETE', 0), ('TT', 'SELECT', 0), ('TT', 'EXECUTE', 0),
+       ('SQ', 'INSERT', 0), ('SQ', 'UPDATE', 0), ('SQ', 'DELETE', 0), ('SQ', 'SELECT', 0), ('SQ', 'EXECUTE', 0 );
 
 -------------------------------------------------------------------------------
 --- PRINCIPALS
@@ -902,29 +579,17 @@ GROUP BY class, declared_class, declared_permission;
 
 
 --- Insert all server-level and database-level securables into a working table:
-WITH s
-(
-      parent_class
-    , parent_major_id
-    , class
-    , major_id
-    , principal_id
-    , class_desc
-    , qualified_name
-    , is_server_lvl
-    , [objectType]
-    , [objectTypeDescription]
-) 
+WITH s (parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, objectType, objectTypeDescription) 
 AS (
     -- SERVER
     SELECT NULL AS parent_class, CAST(NULL AS int) AS parent_major_id, 100 AS class, 0 AS major_id, CAST(NULL AS int) AS principal_id, 'SERVER' AS class_desc, CAST(NULL AS nvarchar(max)) AS qualified_name, 1 AS is_server_lvl
-            , [objectType] = 'SERVER'
-            , [objectTypeDescription] = 'SERVER'
+            , [objectType]='SERVER'
+            , [objectTypeDescription]='SERVER'
     UNION ALL
     -- AVAILABILITY GROUP
     SELECT 100 AS parent_class, 0 AS parent_major_id, 108 AS class, agr.replica_metadata_id AS major_id, NULL, 'AVAILABILITY GROUP', N'AVAILABILITY GROUP::'+QUOTENAME(ag.[name]), 1 AS is_server_lvl
-            , [objectType] = 'sys.availability_groups'
-            , [objectTypeDescription] = 'sys.availability_groups'
+            , [objectType]='sys.availability_groups'
+            , [objectTypeDescription]='sys.availability_groups'
     FROM sys.availability_groups AS ag
     INNER JOIN sys.availability_replicas agr on agr.group_id=ag.group_id
     INNER JOIN sys.dm_hadr_availability_replica_states AS agrs ON agrs.replica_id=agr.replica_id AND agrs.is_local=1
@@ -932,42 +597,42 @@ AS (
     UNION ALL
     -- ENDPOINT
     SELECT 100 AS parent_class, 0 AS parent_major_id, 105 AS class, endpoint_id AS major_id, NULL, 'ENDPOINT', N'ENDPOINT::'+QUOTENAME([name]), 1 AS is_server_lvl
-            , [objectType] = 'sys.endpoints'
-            , [objectTypeDescription] = 'sys.endpoints'
+            , [objectType]='sys.endpoints'
+            , [objectTypeDescription]='sys.endpoints'
     FROM master.sys.endpoints
     UNION ALL
     -- LOGIN, SERVER ROLE
     SELECT 100 AS parent_class, 0 AS parent_major_id, 101 AS class, principal_id AS major_id, owning_principal_id,
            (CASE [type] WHEN 'R' THEN N'SERVER ROLE' ELSE N'LOGIN' END),
            (CASE [type] WHEN 'R' THEN N'SERVER ROLE' ELSE N'LOGIN' END)+N'::'+QUOTENAME([name]), 1 AS is_server_lvl
-           , [objectType] = 'sys.server_principals'
-           , [objectTypeDescription] = 'sys.server_principals'
+           , [objectType]='sys.server_principals'
+           , [objectTypeDescription]='sys.server_principals'
     FROM master.sys.server_principals
     UNION ALL
     -- SEARCH PROPERTY LIST
     SELECT 0 AS parent_class, 0 AS parent_major_id, 31 AS class, property_list_id AS major_id, principal_id, 'SEARCH PROPERTY LIST', N'SEARCH PROPERTY LIST::'+QUOTENAME([name]) COLLATE database_default, 0 AS is_server_lvl
-        , [objectType] = 'sys.registered_search_property_lists'
-        , [objectTypeDescription] = 'sys.registered_search_property_lists'
+        , [objectType]='sys.registered_search_property_lists'
+        , [objectTypeDescription]='sys.registered_search_property_lists'
     FROM sys.registered_search_property_lists
     UNION ALL
     -- DATABASE
     SELECT 100 AS parent_class, 0 AS parent_major_id, 0 AS class, 0 AS major_id, p.principal_id, 'DATABASE' AS class_desc, N'DATABASE::'+QUOTENAME(DB_NAME()), 0 AS is_server_lvl
-            , [objectType] = 'sys.databases'
-            , [objectTypeDescription] = 'sys.databases'
+            , [objectType]='sys.databases'
+            , [objectTypeDescription]='sys.databases'
     FROM sys.databases AS db
     LEFT JOIN sys.database_principals AS p ON db.owner_sid=p.[sid]
     WHERE db.database_id=DB_ID()
     UNION ALL
     -- SCHEMA
     SELECT 0 AS parent_class, 0 AS parent_major_id, 3 AS class, [schema_id] AS major_id, principal_id, 'SCHEMA' AS class_desc, N'SCHEMA::'+QUOTENAME([name]), 0 AS is_server_lvl
-        ,  [objectType] = @SECURABLE_CLASS_SCHEMA
-        ,  [objectTypeDescription] = @SECURABLE_CLASS_SCHEMA
+        ,  [objectType]='SCHEMA'
+        ,  [objectTypeDescription]='SCHEMA'
     FROM sys.schemas
     UNION ALL
     --- OBJECT
     SELECT 3 AS parent_class, o.[schema_id] AS parent_major_id, 1 AS class, o.[object_id] AS major_id, o.principal_id, 'OBJECT' AS class_desc, QUOTENAME(s.[name])+N'.'+QUOTENAME(o.[name]), 0 AS is_server_lvl
-            , [objectType] = o.[type]
-            , [objectTypeDescription] = o.[type_desc]
+            , [objectType]=o.[type]
+            , [objectTypeDescription]=o.[type_desc]
     FROM sys.schemas AS s
     INNER JOIN sys.objects AS o ON s.[schema_id]=o.[schema_id]
     WHERE o.[type] NOT IN ('AF', 'C', 'D', 'F', 'IT', 'PG', 'PK', 'R', 'RF', 'S', 'SN', 'TA', 'TR', 'UQ', 'X')
@@ -976,89 +641,89 @@ AS (
     SELECT 0 AS parent_class, 0 AS parent_major_id, 4 AS class, principal_id AS major_id, owning_principal_id AS principal_id,
            (CASE [type] WHEN 'A' THEN N'APPLICATION ROLE' WHEN 'R' THEN N'ROLE' ELSE N'USER' END),
            (CASE [type] WHEN 'A' THEN N'APPLICATION ROLE' WHEN 'R' THEN N'ROLE' ELSE N'USER' END)+N'::'+QUOTENAME([name]), 0 AS is_server_lvl
-           , [objectType] = 'sys.database_principals'
-           , [objectTypeDescription] = 'sys.database_principals'
+           , [objectType]='sys.database_principals'
+           , [objectTypeDescription]='sys.database_principals'
     FROM sys.database_principals
     UNION ALL
     -- ASSEMBLY
     SELECT 0 AS parent_class, 0 AS parent_major_id, 5 AS class, assembly_id AS major_id, principal_id, 'ASSEMBLY', N'ASSEMBLY::'+QUOTENAME([name]), 0 AS is_server_lvl
-            , [objectType] = 'sys.assemblies'
-            , [objectTypeDescription] = 'sys.assemblies'
+            , [objectType]='sys.assemblies'
+            , [objectTypeDescription]='sys.assemblies'
     FROM sys.assemblies
     UNION ALL
     -- TYPE
     SELECT 3 AS parent_class, t.[schema_id] AS parent_major_id, 6 AS class, t.user_type_id AS major_id, t.principal_id, 'TYPE' AS class_desc, N'TYPE::'+QUOTENAME(s.[name])+N'.'+QUOTENAME(t.[name]), 0 AS is_server_lvl
-            , [objectType] = 'sys.types'
-            , [objectTypeDescription] = 'sys.types'
+            , [objectType]='sys.types'
+            , [objectTypeDescription]='sys.types'
     FROM sys.schemas AS s
     INNER JOIN sys.types AS t ON s.[schema_id]=t.[schema_id]
     WHERE t.is_user_defined=1
     UNION ALL
     -- XML_SCHEMA_COLLECTION
     SELECT 3 AS parent_class, x.[schema_id] AS parent_major_id, 10 AS class, x.xml_collection_id AS major_id, x.principal_id, 'XML SCHEMA COLLECTION' AS class_desc, N'XML SCHEMA COLLECTION::'+QUOTENAME(s.[name])+N'.'+QUOTENAME(x.[name]), 0 AS is_server_lvl
-            , [objectType] = 'sys.xml_schema_collections'
-            , [objectTypeDescription] = 'sys.xml_schema_collections'
+            , [objectType]='sys.xml_schema_collections'
+            , [objectTypeDescription]='sys.xml_schema_collections'
     FROM sys.schemas AS s
     INNER JOIN sys.xml_schema_collections AS x ON s.[schema_id]=x.[schema_id]
     UNION ALL
     -- MESSAGE_TYPE
     SELECT 0 AS parent_class, 0 AS parent_major_id, 15 AS class, message_type_id AS major_id, principal_id, 'MESSAGE TYPE', N'MESSAGE TYPE::'+QUOTENAME([name]), 0 AS is_server_lvl
-            , [objectType] = 'sys.service_message_types'
-            , [objectTypeDescription] = 'sys.service_message_types'
+            , [objectType]='sys.service_message_types'
+            , [objectTypeDescription]='sys.service_message_types'
     FROM sys.service_message_types
     UNION ALL
     -- SERVICE_CONTRACT
     SELECT 0 AS parent_class, 0 AS parent_major_id, 16 AS class, service_contract_id AS major_id, principal_id, 'SERVICE CONTRACT', N'SERVICE CONTRACT::'+QUOTENAME([name]), 0 AS is_server_lvl
-            , [objectType] = 'sys.service_contracts'
-            , [objectTypeDescription] = 'sys.service_contracts'
+            , [objectType]='sys.service_contracts'
+            , [objectTypeDescription]='sys.service_contracts'
     FROM sys.service_contracts
     UNION ALL
     -- SERVICE
     SELECT 0 AS parent_class, 0 AS parent_major_id, 17 AS class, service_id AS major_id, principal_id, 'SERVICE', N'SERVICE::'+QUOTENAME([name]), 0 AS is_server_lvl
-            , [objectType] = 'sys.services'
-            , [objectTypeDescription] = 'sys.services'
+            , [objectType]='sys.services'
+            , [objectTypeDescription]='sys.services'
     FROM sys.services
     UNION ALL
     -- REMOTE_SERVICE_BINDING
     SELECT 0 AS parent_class, 0 AS parent_major_id, 18 AS class, remote_service_binding_id AS major_id, principal_id, 'REMOTE SERVICE BINDING', N'REMOTE SERVICE BINDING::'+QUOTENAME([name]), 0 AS is_server_lvl
-            , [objectType] = 'sys.remote_service_bindings'
-            , [objectTypeDescription] = 'sys.remote_service_bindings'
+            , [objectType]='sys.remote_service_bindings'
+            , [objectTypeDescription]='sys.remote_service_bindings'
     FROM sys.remote_service_bindings
     UNION ALL
     -- ROUTE
     SELECT 0 AS parent_class, 0 AS parent_major_id, 19 AS class, route_id AS major_id, principal_id, 'ROUTE', N'ROUTE::'+QUOTENAME([name]), 0 AS is_server_lvl
-            , [objectType] =  'sys.routes'
-            , [objectTypeDescription] =  'sys.routes'
+            , [objectType]= 'sys.routes'
+            , [objectTypeDescription]= 'sys.routes'
     FROM sys.routes
     UNION ALL
     -- FULLTEXT CATALOG
     SELECT 0 AS parent_class, 0 AS parent_major_id, 23 AS class, fulltext_catalog_id AS major_id, principal_id, 'FULLTEXT CATALOG', N'CATALOG::'+QUOTENAME([name]), 0 AS is_server_lvl
-            , [objectType] =  'sys.fulltext_catalogs'
-            , [objectTypeDescription] =  'sys.fulltext_catalogs'
+            , [objectType]= 'sys.fulltext_catalogs'
+            , [objectTypeDescription]= 'sys.fulltext_catalogs'
     FROM sys.fulltext_catalogs
     UNION ALL
     -- FULLTEXT STOPLIST
     SELECT 0 AS parent_class, 0 AS parent_major_id, 29 AS class, stoplist_id AS major_id, principal_id, 'FULLTEXT STOPLIST', N'STOPLIST::'+QUOTENAME([name]), 0 AS is_server_lvl
-             , [objectType] =  'sys.fulltext_stoplists'
-             , [objectTypeDescription] =  'sys.fulltext_stoplists'
+             , [objectType]= 'sys.fulltext_stoplists'
+             , [objectTypeDescription]= 'sys.fulltext_stoplists'
     FROM sys.fulltext_stoplists
     UNION ALL
     -- SYMMETRIC KEY
     SELECT 0 AS parent_class, 0 AS parent_major_id, 24 AS class, symmetric_key_id AS major_id, principal_id, 'SYMMETRIC KEY', N'SYMMETRIC KEY::'+QUOTENAME([name]), 0 AS is_server_lvl
-             , [objectType] =  'sys.symmetric_keys'
-             , [objectTypeDescription] =  'sys.symmetric_keys'
+             , [objectType]= 'sys.symmetric_keys'
+             , [objectTypeDescription]= 'sys.symmetric_keys'
     FROM sys.symmetric_keys
     UNION ALL
     -- CERTIFICATE
     SELECT 0 AS parent_class, 0 AS parent_major_id, 25 AS class, certificate_id AS major_id, principal_id, 'CERTIFICATE', N'CERTIFICATE::'+QUOTENAME([name]), 0 AS is_server_lvl
-             , [objectType] =  'sys.certificates'
-             , [objectTypeDescription] =  'sys.certificates'
+             , [objectType]= 'sys.certificates'
+             , [objectTypeDescription]= 'sys.certificates'
     FROM sys.certificates
     UNION ALL
     -- ASYMMETRIC_KEY
     SELECT 0 AS parent_class, 0 AS parent_major_id, 26 AS class, asymmetric_key_id AS major_id, principal_id, 'ASYMMETRIC_KEY', N'ASYMMETRIC_KEY::'+QUOTENAME([name]), 0 AS is_server_lvl
-             , [objectType] =  'sys.asymmetric_keys'
-             , [objectTypeDescription] =  'sys.asymmetric_keys'
+             , [objectType]= 'sys.asymmetric_keys'
+             , [objectTypeDescription]= 'sys.asymmetric_keys'
     FROM sys.asymmetric_keys)
 
 INSERT INTO @securables_temp (parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, objectType , [objectTypeDescription])
@@ -1160,7 +825,7 @@ SELECT 100 AS class,
        'G' AS [state],
        'GRANT' AS state_desc,
        NULL AS inheritance,
-       [objectType] = 'sys.server_principals'
+       [objectType]='sys.server_principals'
 FROM sys.server_principals AS sp
 INNER JOIN sys.fn_builtin_permissions('SERVER') AS p ON
       sp.[name]='bulkadmin' AND
@@ -1202,7 +867,7 @@ SELECT 0 AS class,
        s.[state],
        s.state_desc,
        NULL AS inheritance,
-       [objectType] = p.class_desc
+       [objectType]=p.class_desc
 FROM sys.database_principals AS dp
 CROSS JOIN (
     VALUES ('G', 'GRANT'),
@@ -1215,16 +880,16 @@ INNER JOIN sys.fn_builtin_permissions('DATABASE') AS p ON
       p.[permission_name] IN ('BACKUP DATABASE', 'BACKUP LOG', 'CHECKPOINT') OR
 
       dp.[name]='db_datareader' AND s.[state]='G' AND
-      p.[permission_name]=@OPERATION_SELECT OR
+      p.[permission_name]='SELECT' OR
 
       dp.[name]='db_datawriter' AND s.[state]='G' AND
-      p.[permission_name] IN ('INSERT', @OPERATION_DELETE, @OPERATION_UPDATE) OR
+      p.[permission_name] IN ('INSERT', 'DELETE', 'UPDATE') OR
 
       dp.[name]='db_denydatareader' AND s.[state]='D' AND
-      p.[permission_name]=@OPERATION_SELECT OR
+      p.[permission_name]='SELECT' OR
 
       dp.[name]='db_denydatawriter' AND s.[state]='D' AND
-      p.[permission_name] IN ('INSERT', @OPERATION_DELETE, @OPERATION_UPDATE) OR
+      p.[permission_name] IN ('INSERT', 'DELETE', 'UPDATE') OR
 
       dp.[name]='db_ddladmin' AND s.[state]='G' AND
       p.[permission_name] IN ('ALTER ANY ASSEMBLY', 'ALTER ANY ASYMMETRIC KEY',
@@ -1372,50 +1037,19 @@ IF (@output_xml=0)
            sec.[path] AS securable_path,
            grantee.[path] AS principal_path,
 
-           /* Added by dadeniji 2023-03-12 -- Begin */
+           [sec].objectType,
+           [sec].[objectTypeDescription],
+           tblSO.[type] AS objectType, 
+           tblSO.[operation] AS objectOperation,
 
-           [objectType] = [sec].[objectType],
-
-           [objectTypeDescription] = [sec].[objectTypeDescription],
-           
-           [objectType]
-            = tblSO.[type], 
-           
-           [objectOperation]
-            = tblSO.[operation],
-
-           [allowed]
-              = case 
-
-                    when ( sec.class_desc in
-
-                            (
-
-                                  @SECURABLE_CLASS_ENDPOINT
-                                
-                                , @SECURABLE_CLASS_SCHEMA 
-
-
-                            )
-
-                        )
-
-                        then @VALUE_ALLOWED
-
-                    when ( sec.class_desc = @SECURABLE_CLASS_OBJECT )
-
-                        then tblSO.[allowed]
-
-                end,
-
+           (CASE WHEN sec.class_desc IN ('ENDPOINT', 'SCHEMA') THEN 1
+                 WHEN sec.class_desc='OBJECT' THEN tblSO.[allowed]
+                 END) AS [allowed],
            sec.class_desc
-           
-           /* Added by dadeniji 2023-03-12 -- End */
 
     FROM @rules AS perms
 
     INNER JOIN @principals AS grantee ON
-
         grantee.declared_is_server_lvl=perms.grantee_is_server_lvl AND
         grantee.declared_principal_id=perms.grantee_principal_id
 
@@ -1432,35 +1066,21 @@ IF (@output_xml=0)
             p.class NOT IN ('SERVER', 'SERVER_PRINCIPAL', 'ENDPOINT') AND grantee.effective_is_server_lvl=0)
 
     INNER JOIN @securables AS sec ON
-
         perms.class=sec.parent_class AND
-
         perms.major_id=sec.parent_major_id AND
-
         p.class=sec.class_desc
 
-   /*
-        dadeniji 2023-03-12 04:02 PM
-   */
-   LEFT OUTER JOIN @tblSupportObject tblSO
-
-        on   1 =1
+   LEFT JOIN @tblSupportObject AS tblSO ON
         
-        and  [sec].[class_desc] = 'OBJECT'
-
-        and  [sec].[objectType] = tblSO.[type] 
-        
-        and   [p].[permission] = tblSO.[operation]
-
+        [sec].[class_desc]='OBJECT' AND
+        [sec].[objectType]=tblSO.[type] AND
+        p.[permission]=tblSO.[operation]
 
     WHERE (@principal IS NULL OR grantee.effective_name LIKE @principal) AND
           (@securable IS NULL OR sec.qualified_name LIKE @securable) AND
           (@permission IS NULL OR perms.[permission_name] LIKE @permission OR p.permission LIKE @permission)
 
-
-    ORDER BY
-             
-             sec.parent_class,
+    ORDER BY sec.parent_class,
              sec.parent_qualified_name,
              p.declared_permission,
              perms.state_desc,
