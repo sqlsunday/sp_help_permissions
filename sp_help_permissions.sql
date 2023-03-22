@@ -1,4 +1,6 @@
+/*
 USE master;
+*/
 GO
 IF (OBJECT_ID('dbo.sp_help_permissions') IS NULL) EXEC('CREATE PROCEDURE dbo.sp_help_permissions AS --');
 GO
@@ -43,7 +45,7 @@ SET DEADLOCK_PRIORITY LOW;
 
 IF (@output_xml=1) SET @permission_list=0;
 
-
+DECLARE @is_azure bit=(CASE WHEN CAST(SERVERPROPERTY('Edition') AS varchar(100)) LIKE '%Azure%' THEN 1 ELSE 0 END);
 
 -------------------------------------------------------------------------------
 --- Variables and work table declarations
@@ -51,7 +53,7 @@ IF (@output_xml=1) SET @permission_list=0;
 
 
 
-DECLARE @name sysname;
+DECLARE @name sysname, @sql nvarchar(max);
 
 DECLARE @xp_logininfo TABLE (
 	account_name			sysname NOT NULL,
@@ -111,9 +113,8 @@ DECLARE @principals TABLE (
 	PRIMARY KEY CLUSTERED (declared_type_desc, declared_principal_id, effective_type_desc, effective_principal_id, _id)
 );
 
-DECLARE @s_public int=(SELECT principal_id FROM sys.server_principals WHERE [name]=N'public');
-DECLARE @d_public int=(SELECT principal_id FROM sys.database_principals WHERE [name]=N'public');
-DECLARE @sysadmin int=(SELECT principal_id FROM sys.server_principals WHERE [name]=N'sysadmin');
+DECLARE @d_public int, @sysadmin int;
+SELECT @d_public=principal_id FROM sys.database_principals WHERE [name]=N'public';
 
 DECLARE @builtin_permissions TABLE (
     class                   nvarchar(60) NOT NULL,
@@ -239,13 +240,21 @@ VALUES ('U',  'INSERT', 1), ('U',  'UPDATE', 1), ('U',  'DELETE', 1), ('U',  'SE
 
 
 
---- Server principals:
-INSERT INTO @srv_principals
-SELECT principal_id, [type_desc], [sid], [name]
-FROM sys.server_principals
-WHERE [sid] IS NOT NULL AND (
-    @hide_system_principals=0 OR
-    @hide_system_principals=1 AND [type]!='C' AND UPPER([name]) NOT LIKE N'NT SERVICE\%');
+IF (@is_azure=0) BEGIN;
+    SET @sql=N'
+        SELECT principal_id, [type_desc], [sid], [name]
+        FROM sys.server_principals
+        WHERE [sid] IS NOT NULL'+(CASE WHEN @hide_system_principals=1 THEN N'
+          AND [type]!=''C'' AND UPPER([name]) NOT LIKE N''NT SERVICE\%''' ELSE N'' END);
+
+    --- Server principals:
+    INSERT INTO @srv_principals (principal_id, [type_desc], [sid], [name])
+    EXECUTE sys.sp_executesql @sql;
+END;
+
+
+SELECT @sysadmin=principal_id FROM @srv_principals WHERE [name]=N'sysadmin';
+
 
 --- Windows users that are members of Windows group logins can be
 --- resolved using xp_logininfo:
@@ -595,19 +604,13 @@ AS (
     INNER JOIN sys.dm_hadr_availability_replica_states AS agrs ON agrs.replica_id=agr.replica_id AND agrs.is_local=1
     WHERE agr.replica_metadata_id IS NOT NULL   -- temporary workaround to fix NULL values in major_id (replica_metadata_id)
     UNION ALL
-    -- ENDPOINT
-    SELECT 100 AS parent_class, 0 AS parent_major_id, 105 AS class, endpoint_id AS major_id, NULL, 'ENDPOINT', N'ENDPOINT::'+QUOTENAME([name]), 1 AS is_server_lvl
-            , [objectType]='sys.endpoints'
-            , [objectTypeDescription]='sys.endpoints'
-    FROM master.sys.endpoints
-    UNION ALL
     -- LOGIN, SERVER ROLE
     SELECT 100 AS parent_class, 0 AS parent_major_id, 101 AS class, principal_id AS major_id, owning_principal_id,
            (CASE [type] WHEN 'R' THEN N'SERVER ROLE' ELSE N'LOGIN' END),
            (CASE [type] WHEN 'R' THEN N'SERVER ROLE' ELSE N'LOGIN' END)+N'::'+QUOTENAME([name]), 1 AS is_server_lvl
            , [objectType]='sys.server_principals'
            , [objectTypeDescription]='sys.server_principals'
-    FROM master.sys.server_principals
+    FROM @srv_principals
     UNION ALL
     -- SEARCH PROPERTY LIST
     SELECT 0 AS parent_class, 0 AS parent_major_id, 31 AS class, property_list_id AS major_id, principal_id, 'SEARCH PROPERTY LIST', N'SEARCH PROPERTY LIST::'+QUOTENAME([name]) COLLATE database_default, 0 AS is_server_lvl
@@ -729,6 +732,26 @@ AS (
 INSERT INTO @securables_temp (parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, objectType , [objectTypeDescription])
 SELECT parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, s.objectType,  s.[objectTypeDescription]
 FROM s;
+
+
+IF (@is_azure=0) BEGIN;
+
+    --- Server-level and database-level securables that only work on-prem:
+    INSERT INTO @securables_temp (parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, objectType , [objectTypeDescription])
+    EXEC('
+    WITH s (parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, objectType, objectTypeDescription) 
+        -- ENDPOINT
+        SELECT 100 AS parent_class, 0 AS parent_major_id, 105 AS class, endpoint_id AS major_id, NULL, ''ENDPOINT'', N''ENDPOINT::''+QUOTENAME([name]), 1 AS is_server_lvl
+                , [objectType]=''sys.endpoints''
+                , [objectTypeDescription]=''sys.endpoints''
+        FROM master.sys.endpoints)
+
+    SELECT parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, s.objectType,  s.[objectTypeDescription]
+    FROM s;
+    ');
+
+END;
+
 
 --- Build a hierarchy of @securables_temp, using a recursive CTE:
 WITH cte AS (
