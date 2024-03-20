@@ -1,4 +1,6 @@
+/*
 USE master;
+*/
 GO
 IF (OBJECT_ID('dbo.sp_help_permissions') IS NULL) EXEC('CREATE PROCEDURE dbo.sp_help_permissions AS --');
 GO
@@ -36,18 +38,17 @@ ALTER PROCEDURE dbo.sp_help_permissions
     @xml                        xml=NULL OUTPUT
 WITH EXECUTE AS CALLER
 AS
+BEGIN
 SET NOCOUNT ON;
 SET STATISTICS XML, TIME, IO OFF;
 SET DEADLOCK_PRIORITY LOW;
-
-BEGIN TRY;
 
 IF (@output_xml=1) SET @permission_list=0;
 
 DECLARE @is_azure bit=(CASE WHEN CAST(SERVERPROPERTY('Edition') AS varchar(100)) LIKE '%Azure%' THEN 1 ELSE 0 END);
 
 -------------------------------------------------------------------------------
-;RAISERROR('Variables and work table declarations',0,0) WITH NOWAIT
+--- Variables and work table declarations
 -------------------------------------------------------------------------------
 
 
@@ -234,7 +235,7 @@ VALUES ('U',  'INSERT', 1), ('U',  'UPDATE', 1), ('U',  'DELETE', 1), ('U',  'SE
        ('SQ', 'INSERT', 0), ('SQ', 'UPDATE', 0), ('SQ', 'DELETE', 0), ('SQ', 'SELECT', 0), ('SQ', 'EXECUTE', 0 );
 
 -------------------------------------------------------------------------------
-;RAISERROR('PRINCIPALS',0,0) WITH NOWAIT
+--- PRINCIPALS
 -------------------------------------------------------------------------------
 
 
@@ -245,8 +246,8 @@ IF (@is_azure=0) BEGIN;
         FROM sys.server_principals
         WHERE [sid] IS NOT NULL'+(CASE WHEN @hide_system_principals=1 THEN N'
           AND [type]!=''C'' AND UPPER([name]) NOT LIKE N''NT SERVICE\%''' ELSE N'' END);
-	;RAISERROR (@sql,0,0) WITH NOWAIT
-    ;RAISERROR('Server principals:',0,0) WITH NOWAIT
+
+    --- Server principals:
     INSERT INTO @srv_principals (principal_id, [type_desc], [sid], [name])
     EXECUTE sys.sp_executesql @sql;
 END;
@@ -255,7 +256,8 @@ END;
 SELECT @sysadmin=principal_id FROM @srv_principals WHERE [name]=N'sysadmin';
 
 
-;RAISERROR('Windows users that are members of Windows group logins can be resolved using xp_logininfo:',0,0) WITH NOWAIT
+--- Windows users that are members of Windows group logins can be
+--- resolved using xp_logininfo:
 BEGIN TRANSACTION;
 
 	DECLARE logincur CURSOR LOCAL FOR
@@ -268,14 +270,11 @@ BEGIN TRANSACTION;
 	WHILE (@@FETCH_STATUS=0) BEGIN;
 		
         IF (@name NOT LIKE 'NT AUTHORITY\%')
-		BEGIN
 		    INSERT INTO @xp_logininfo
 		    EXECUTE sys.xp_logininfo @acctname=@name, @option='members';
-		END
 
-        ;RAISERROR('NT AUTHORITY\Authenticated Users really doesn''t play nice with xp_logininfo:',0,0) WITH NOWAIT
-        IF (@name LIKE 'NT AUTHORITY\%')
-		BEGIN;
+        --- NT AUTHORITY\Authenticated Users really doesn't play nice with xp_logininfo:
+        IF (@name LIKE 'NT AUTHORITY\%') BEGIN;
 		    INSERT INTO @xp_logininfo
 		    EXECUTE sys.xp_logininfo;
 
@@ -300,74 +299,74 @@ FROM (
     WHERE account_name NOT IN (SELECT [name] FROM @srv_principals WHERE [type_desc]=N'WINDOWS_LOGIN')
     ) AS sub;
 
-;RAISERROR('Server role members:',0,0) WITH NOWAIT
+--- Server role members:
 INSERT INTO @srv_members
 SELECT role_principal_id, member_principal_id
 FROM sys.server_role_members;
 
-;RAISERROR('All users are also members of the fixed server role "public":',0,0) WITH NOWAIT
+--- All users are also members of the fixed server role "public":
 INSERT INTO @srv_members (role_principal_id, member_principal_id)
 SELECT r.principal_id, m.principal_id
 FROM @srv_principals AS r
-JOIN @srv_principals AS m ON m.[type_desc]!='SERVER_ROLE'
+INNER JOIN @srv_principals AS m ON m.[type_desc]!='SERVER_ROLE'
 WHERE r.[name]='public' AND m.principal_id>=0;
 
-;RAISERROR('User memberships implicit from their WINDOWS_GROUP logins:',0,0) WITH NOWAIT
+--- User memberships implicit from their WINDOWS_GROUP logins:
 INSERT INTO @srv_members (role_principal_id, member_principal_id)
 SELECT r.principal_id, m.principal_id
 FROM @xp_logininfo AS xp
-JOIN @srv_principals AS r ON xp.permission_path=r.[name]
-JOIN @srv_principals AS m ON xp.account_name=m.[name];
+INNER JOIN @srv_principals AS r ON xp.permission_path=r.[name]
+INNER JOIN @srv_principals AS m ON xp.account_name=m.[name];
 
-;RAISERROR('All local database principals:',0,0) WITH NOWAIT
+--- All local database principals:
 INSERT INTO @db_principals (principal_id, [type_desc], [sid], [name])
 SELECT dp.principal_id, dp.[type_desc], dp.[sid], dp.[name]
 FROM sys.database_principals AS dp
-WHERE dp.[sid] IS NOT NULL --Don't include "INFORMATION_SCHEMA" and "sys"
+WHERE dp.[sid] IS NOT NULL;			--- Don't include "INFORMATION_SCHEMA" and "sys"
 
-;RAISERROR('Implicit database principals inherited from their respective server principals:',0,0) WITH NOWAIT
+--- Implicit database principals inherited from their respective server principals:
 INSERT INTO @db_principals (principal_id, [type_desc], [sid], [name])
 SELECT DISTINCT wl.principal_id, N'WINDOWS_USER' AS [type_desc], wl.[sid], wl.[name]
 FROM @srv_principals AS wg
-JOIN @srv_members AS m ON wg.principal_id=m.role_principal_id AND m.member_principal_id<0
-JOIN @srv_principals AS wl ON m.member_principal_id=wl.principal_id
-JOIN @db_principals AS dp ON dp.[sid]=wg.[sid];
+INNER JOIN @srv_members AS m ON wg.principal_id=m.role_principal_id AND m.member_principal_id<0
+INNER JOIN @srv_principals AS wl ON m.member_principal_id=wl.principal_id
+INNER JOIN @db_principals AS dp ON dp.[sid]=wg.[sid];
 
-;RAISERROR('Logins with sysadmin, except those who already have users:',0,0) WITH NOWAIT
+--- Logins with sysadmin, except those who already have users:
 INSERT INTO @db_principals (principal_id, [type_desc], [sid], [name], member_of)
 SELECT (SELECT MAX(principal_id) FROM @db_principals)+
        ROW_NUMBER() OVER (ORDER BY sp.principal_id) AS principal_id,
        REPLACE(sp.[type_desc], N'_LOGIN', N'_USER'), sp.[sid], sp.[name], dbo.principal_id
 FROM @srv_principals AS sp
 LEFT JOIN @db_principals AS db ON sp.[sid]=db.[sid]
-JOIN @db_principals AS dbo ON dbo.[name]=N'dbo'
+INNER JOIN @db_principals AS dbo ON dbo.[name]=N'dbo'
 WHERE db.[sid] IS NULL AND (
       sp.principal_id IN (SELECT grantee_principal_id FROM sys.server_permissions WHERE [permission_name]=N'CONTROL SERVER') OR
       sp.principal_id=(SELECT owner_sid FROM sys.databases WHERE database_id=DB_ID()) OR
       sp.principal_id IN (SELECT member_principal_id FROM sys.server_role_members WHERE role_principal_id=@sysadmin)
     );
 
-;RAISERROR('All users are members of the fixed database role public:',0,0) WITH NOWAIT
+--- All users are members of the fixed database role public:
 INSERT INTO @db_members (role_principal_id, member_principal_id)
 SELECT r.principal_id, m.principal_id
 FROM @db_principals AS r
-JOIN @db_principals AS m ON m.[type_desc]!='DATABASE_ROLE'
+INNER JOIN @db_principals AS m ON m.[type_desc]!='DATABASE_ROLE'
 WHERE r.[name]='public';
 
-;RAISERROR('Database role memberships:',0,0) WITH NOWAIT
+--- Database role memberships:
 INSERT INTO @db_members
 SELECT role_principal_id, member_principal_id
 FROM sys.database_role_members;
 
-;RAISERROR('Administrative users and the owner of the database are "members" of "dbo":',0,0) WITH NOWAIT
+--- Administrative users and the owner of the database are "members" of "dbo":
 INSERT INTO @db_members
 SELECT member_of, principal_id
 FROM @db_principals
 WHERE member_of IS NOT NULL AND member_of!=principal_id;
 
-;RAISERROR('Putting it all together:',0,0) WITH NOWAIT
-;WITH s_cte AS (
-        --;RAISERROR(Server principals (anchor)
+--- Putting it all together:
+WITH s_cte AS (
+        --- Server principals (anchor)
 		SELECT principal_id AS declared_principal_id,
 			   [type_desc] AS declared_type_desc,
 			   [sid] AS declared_sid,
@@ -382,7 +381,7 @@ WHERE member_of IS NOT NULL AND member_of!=principal_id;
 
 		UNION ALL
 
-		--;RAISERROR('(recursion)',0,0) WITH NOWAIT
+		--- (recursion)
         SELECT s_cte.declared_principal_id,
 			   s_cte.declared_type_desc,
 			   s_cte.declared_sid,
@@ -394,14 +393,14 @@ WHERE member_of IS NOT NULL AND member_of!=principal_id;
 			   s_cte.[level]+1,
 			   s_cte.[path]+' -> '+CAST((CASE WHEN sp.[name] IN ('sa') THEN N'"'+sp.[name]+N'"' ELSE LOWER(REPLACE(sp.[type_desc], N'_', N' ')) COLLATE database_default+N' "'+sp.[name]+N'"' END) AS nvarchar(max)) AS [path]
 		FROM @srv_members AS srm
-		JOIN s_cte ON s_cte.effective_principal_id=srm.role_principal_id
-		JOIN @srv_principals AS sp ON srm.member_principal_id=sp.principal_id
+		INNER JOIN s_cte ON s_cte.effective_principal_id=srm.role_principal_id
+		INNER JOIN @srv_principals AS sp ON srm.member_principal_id=sp.principal_id
         WHERE s_cte.declared_name NOT LIKE 'NT AUTHORITY\%'
           AND sp.[name] NOT LIKE 'NT AUTHORITY\%'
           AND s_cte.declared_principal_id!=sp.principal_id), -- vain attempt to stop infinite recursion
 
 	d_cte AS (
-		--RROR('Database principals (anchor)',0,0) WITH NOWAIT
+		--- Database principals (anchor)
         SELECT principal_id AS declared_principal_id,
 			   [type_desc] AS declared_type_desc,
 			   [sid] AS declared_sid,
@@ -416,7 +415,7 @@ WHERE member_of IS NOT NULL AND member_of!=principal_id;
 
 		UNION ALL
 
-		--RROR('(recursion)',0,0) WITH NOWAIT
+		--- (recursion)
         SELECT d_cte.declared_principal_id,
 			   d_cte.declared_type_desc,
 			   d_cte.declared_sid,
@@ -428,12 +427,12 @@ WHERE member_of IS NOT NULL AND member_of!=principal_id;
 			   d_cte.[level]+1,
 			   d_cte.[path]+' -> '+CAST((CASE WHEN dp.[name] IN ('dbo') THEN N'"'+dp.[name]+N'"' ELSE LOWER(REPLACE(dp.[type_desc], N'_', N' ')) COLLATE database_default+N' "'+dp.[name]+N'"' END) AS nvarchar(max)) AS [path]
 		FROM @db_members AS drm
-		JOIN d_cte ON d_cte.effective_principal_id=drm.role_principal_id
-		JOIN @db_principals AS dp ON drm.member_principal_id=dp.principal_id
+		INNER JOIN d_cte ON d_cte.effective_principal_id=drm.role_principal_id
+		INNER JOIN @db_principals AS dp ON drm.member_principal_id=dp.principal_id
         WHERE d_cte.declared_principal_id!=dp.principal_id), -- vain attempt to stop infinite recursion
 
 	cte AS (
-		--RROR('Server principal hierarchy',0,0) WITH NOWAIT
+		--- Server principal hierarchy
         SELECT declared_principal_id,
 			   declared_type_desc,
 			   declared_sid,
@@ -450,7 +449,7 @@ WHERE member_of IS NOT NULL AND member_of!=principal_id;
 
 		UNION ALL
 
-		--RROR('Database principal hierarchy',0,0) WITH NOWAIT
+		--- Database principal hierarchy
         SELECT declared_principal_id,
 			   declared_type_desc,
 			   declared_sid,
@@ -467,7 +466,7 @@ WHERE member_of IS NOT NULL AND member_of!=principal_id;
 
 		UNION ALL
 
-		--RROR(Connecting the server and database principal hierarchies
+		--- Connecting the server and database principal hierarchies
         SELECT s_cte.declared_principal_id,
 			   s_cte.declared_type_desc,
 			   s_cte.declared_sid,
@@ -481,7 +480,7 @@ WHERE member_of IS NOT NULL AND member_of!=principal_id;
 			   s_cte.[level]+d_cte.[level]+1,
 			   s_cte.[path]+N' --> '+d_cte.[path] AS [path]
 		FROM s_cte
-		JOIN d_cte ON s_cte.effective_sid=d_cte.declared_sid
+		INNER JOIN d_cte ON s_cte.effective_sid=d_cte.declared_sid
         )
 
 INSERT INTO @principals
@@ -492,7 +491,7 @@ WHERE @principal IS NULL OR
 
 
 -------------------------------------------------------------------------------
-;RAISERROR('Permissions',0,0) WITH NOWAIT
+--- Permissions
 -------------------------------------------------------------------------------
 
 
@@ -502,9 +501,9 @@ SELECT bip.class_desc AS class, bip.[permission_name] AS permission,
        x.declared_class, x.declared_permission_name
 FROM sys.fn_builtin_permissions(DEFAULT) AS bip
 OUTER APPLY (
-    --Every permission can inherit permissions from up to two
-    --other permissions: from a parent class, as well as from
-    --other permissions in the same class:
+    --- Every permission can inherit permissions from up to two
+    --- other permissions: from a parent class, as well as from
+    --- other permissions in the same class:
     SELECT bip.parent_class_desc,
             bip.parent_covering_permission_name
     WHERE bip.parent_covering_permission_name!=''
@@ -515,7 +514,7 @@ OUTER APPLY (
     ) AS x(declared_class, declared_permission_name);
 
 WITH cte AS (
-    --RROR(Anchor:
+    --- Anchor:
     SELECT class,
            permission,
            class AS declared_class,
@@ -527,7 +526,7 @@ WITH cte AS (
 
     UNION ALL
 
-    --RROR(Recursion: inherited permissions:
+    --- Recursion: inherited permissions:
     SELECT p.class,
            p.permission,
            cte.declared_class,
@@ -535,11 +534,11 @@ WITH cte AS (
            CAST(cte.[path]+N' -> '+(CASE WHEN p.permission=p.declared_permission OR @permission_list=1 THEN N'' ELSE p.permission+N' on ' END)+p.class AS nvarchar(max)) AS [path],
            cte.[level]+1
     FROM @builtin_permissions AS p
-    JOIN cte ON
+    INNER JOIN cte ON
         p.declared_class=cte.class AND
         p.declared_permission=cte.permission)
 
---Save the results into temporary work table:
+--- Save the results into temporary work table:
 INSERT INTO @permissions_temp (class, permission, declared_class, declared_permission, [path], [level])
 SELECT class, permission, declared_class, declared_permission, [path], [level]
 FROM (
@@ -554,15 +553,16 @@ WHERE _rn=1;
 
 
 
-;RAISERROR('If @permission_list is 0, dump the results into @permissions, and we''re done.',0,0) WITH NOWAIT
-;INSERT INTO @permissions (class, permission, declared_class, declared_permission, [path], [level])
+--- If @permission_list is 0, dump the results into @permissions, and we're done.
+INSERT INTO @permissions (class, permission, declared_class, declared_permission, [path], [level])
 SELECT class, permission, declared_class, declared_permission, [path], [level]
 FROM @permissions_temp
 WHERE @permission_list=0;
 
 
 
-;RAISERROR('If @permission_list is 1, compile a comma-separated list of permissions from the work table and insert into @permissions:',0,0) WITH NOWAIT
+--- If @permission_list is 1, compile a comma-separated list of permissions for
+--- from the work table and insert into @permissions:
 INSERT INTO @permissions (class, permission, declared_class, declared_permission, [path], [level])
 SELECT class, SUBSTRING(CAST((SELECT N', '+x.permission
                               FROM @permissions_temp AS x
@@ -578,66 +578,46 @@ WHERE @permission_list=1 AND (
           @permission IS NULL OR
           [path] LIKE N'%'+@permission+N'%')
 GROUP BY class, declared_class, declared_permission;
+
+
+
 -------------------------------------------------------------------------------
-;RAISERROR('Securables',0,0) WITH NOWAIT
+--- Securables
 -------------------------------------------------------------------------------
-;RAISERROR('Insert all server-level and database-level securables into a working table:',0,0) WITH NOWAIT
-;INSERT INTO @securables_temp (
-	parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, objectType , [objectTypeDescription]
-	)
+
+
+
+--- Insert all server-level and database-level securables into a working table:
+WITH s (parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, objectType, objectTypeDescription) 
+AS (
     -- SERVER
     SELECT NULL AS parent_class, CAST(NULL AS int) AS parent_major_id, 100 AS class, 0 AS major_id, CAST(NULL AS int) AS principal_id, 'SERVER' AS class_desc, CAST(NULL AS nvarchar(max)) AS qualified_name, 1 AS is_server_lvl
             , [objectType]='SERVER'
             , [objectTypeDescription]='SERVER'
-    
-;INSERT INTO @securables_temp (
-	parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, objectType , [objectTypeDescription]
-	)
+    UNION ALL
     -- AVAILABILITY GROUP
-    SELECT 100 AS parent_class
-		, 0 AS parent_major_id
-		, 108 AS class
-		, agr.replica_metadata_id AS major_id
-		, NULL
-		, 'AVAILABILITY GROUP'
-		, N'AVAILABILITY GROUP::'+QUOTENAME(ag.[name])
-		, 1 AS is_server_lvl
-        , [objectType]='sys.availability_groups'
-        , [objectTypeDescription]='sys.availability_groups'
+    SELECT 100 AS parent_class, 0 AS parent_major_id, 108 AS class, agr.replica_metadata_id AS major_id, NULL, 'AVAILABILITY GROUP', N'AVAILABILITY GROUP::'+QUOTENAME(ag.[name]), 1 AS is_server_lvl
+            , [objectType]='sys.availability_groups'
+            , [objectTypeDescription]='sys.availability_groups'
     FROM sys.availability_groups AS ag
-    JOIN sys.availability_replicas agr on agr.group_id=ag.group_id
-    JOIN sys.dm_hadr_availability_replica_states AS agrs ON agrs.replica_id=agr.replica_id AND agrs.is_local=1
+    INNER JOIN sys.availability_replicas agr on agr.group_id=ag.group_id
+    INNER JOIN sys.dm_hadr_availability_replica_states AS agrs ON agrs.replica_id=agr.replica_id AND agrs.is_local=1
     WHERE agr.replica_metadata_id IS NOT NULL   -- temporary workaround to fix NULL values in major_id (replica_metadata_id)
-  ;INSERT INTO @securables_temp (
-	parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, objectType , [objectTypeDescription]
-	)
+    UNION ALL
     -- LOGIN, SERVER ROLE
-    SELECT 100 AS parent_class
-		, 0 AS parent_major_id
-		, 101 AS class
-		, principal_id AS major_id
-		, NULL
-		,(CASE [type_desc] WHEN 'R' THEN N'SERVER ROLE' ELSE N'LOGIN' END)
-		,(CASE [type_desc] WHEN 'R' THEN N'SERVER ROLE' ELSE N'LOGIN' END) + N'::' + QUOTENAME([name])
-		, 1 AS is_server_lvl
-        , [objectType]='sys.server_principals'
-        , [objectTypeDescription]='sys.server_principals'
+    SELECT 100 AS parent_class, 0 AS parent_major_id, 101 AS class, principal_id AS major_id, NULL AS owning_principal_id,
+           (CASE [type_desc] WHEN 'R' THEN N'SERVER ROLE' ELSE N'LOGIN' END),
+           (CASE [type_desc] WHEN 'R' THEN N'SERVER ROLE' ELSE N'LOGIN' END)+N'::'+QUOTENAME([name]), 1 AS is_server_lvl
+           , [objectType]='sys.server_principals'
+           , [objectTypeDescription]='sys.server_principals'
     FROM @srv_principals
-;INSERT INTO @securables_temp (
-	parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, objectType , [objectTypeDescription]
-	)
+    UNION ALL
     -- SEARCH PROPERTY LIST
-    SELECT 0 AS parent_class, 0 AS parent_major_id, 31 AS class, property_list_id AS major_id
-		, principal_id
-		, 'SEARCH PROPERTY LIST'
-		, N'SEARCH PROPERTY LIST::' + QUOTENAME([name]) COLLATE database_default
-		, 0 AS is_server_lvl
+    SELECT 0 AS parent_class, 0 AS parent_major_id, 31 AS class, property_list_id AS major_id, principal_id, 'SEARCH PROPERTY LIST', N'SEARCH PROPERTY LIST::'+QUOTENAME([name]) COLLATE database_default, 0 AS is_server_lvl
         , [objectType]='sys.registered_search_property_lists'
         , [objectTypeDescription]='sys.registered_search_property_lists'
     FROM sys.registered_search_property_lists
- ;INSERT INTO @securables_temp (
-	parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, objectType , [objectTypeDescription]
-	)
+    UNION ALL
     -- DATABASE
     SELECT 100 AS parent_class, 0 AS parent_major_id, 0 AS class, 0 AS major_id, p.principal_id, 'DATABASE' AS class_desc, N'DATABASE::'+QUOTENAME(DB_NAME()), 0 AS is_server_lvl
             , [objectType]='sys.databases'
@@ -645,27 +625,21 @@ GROUP BY class, declared_class, declared_permission;
     FROM sys.databases AS db
     LEFT JOIN sys.database_principals AS p ON db.owner_sid=p.[sid]
     WHERE db.database_id=DB_ID()
-  ;INSERT INTO @securables_temp (
-	parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, objectType , [objectTypeDescription]
-	)
+    UNION ALL
     -- SCHEMA
     SELECT 0 AS parent_class, 0 AS parent_major_id, 3 AS class, [schema_id] AS major_id, principal_id, 'SCHEMA' AS class_desc, N'SCHEMA::'+QUOTENAME([name]), 0 AS is_server_lvl
         ,  [objectType]='SCHEMA'
         ,  [objectTypeDescription]='SCHEMA'
     FROM sys.schemas
-  ;INSERT INTO @securables_temp (
-	parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, objectType , [objectTypeDescription]
-	)
-    --RROR(OBJECT
+    UNION ALL
+    --- OBJECT
     SELECT 3 AS parent_class, o.[schema_id] AS parent_major_id, 1 AS class, o.[object_id] AS major_id, o.principal_id, 'OBJECT' AS class_desc, QUOTENAME(s.[name])+N'.'+QUOTENAME(o.[name]), 0 AS is_server_lvl
             , [objectType]=o.[type]
             , [objectTypeDescription]=o.[type_desc]
     FROM sys.schemas AS s
-    JOIN sys.objects AS o ON s.[schema_id]=o.[schema_id]
+    INNER JOIN sys.objects AS o ON s.[schema_id]=o.[schema_id]
     WHERE o.[type] NOT IN ('AF', 'C', 'D', 'F', 'IT', 'PG', 'PK', 'R', 'RF', 'S', 'SN', 'TA', 'TR', 'UQ', 'X')
- ;INSERT INTO @securables_temp (
-	parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, objectType , [objectTypeDescription]
-	)
+    UNION ALL
     -- USER, ROLE
     SELECT 0 AS parent_class, 0 AS parent_major_id, 4 AS class, principal_id AS major_id, owning_principal_id AS principal_id,
            (CASE [type] WHEN 'A' THEN N'APPLICATION ROLE' WHEN 'R' THEN N'ROLE' ELSE N'USER' END),
@@ -673,145 +647,112 @@ GROUP BY class, declared_class, declared_permission;
            , [objectType]='sys.database_principals'
            , [objectTypeDescription]='sys.database_principals'
     FROM sys.database_principals
- ;INSERT INTO @securables_temp (
-	parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, objectType , [objectTypeDescription]
-	)
+    UNION ALL
     -- ASSEMBLY
     SELECT 0 AS parent_class, 0 AS parent_major_id, 5 AS class, assembly_id AS major_id, principal_id, 'ASSEMBLY', N'ASSEMBLY::'+QUOTENAME([name]), 0 AS is_server_lvl
             , [objectType]='sys.assemblies'
             , [objectTypeDescription]='sys.assemblies'
     FROM sys.assemblies
-  ;INSERT INTO @securables_temp (
-	parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, objectType , [objectTypeDescription]
-	)
+    UNION ALL
     -- TYPE
     SELECT 3 AS parent_class, t.[schema_id] AS parent_major_id, 6 AS class, t.user_type_id AS major_id, t.principal_id, 'TYPE' AS class_desc, N'TYPE::'+QUOTENAME(s.[name])+N'.'+QUOTENAME(t.[name]), 0 AS is_server_lvl
             , [objectType]='sys.types'
             , [objectTypeDescription]='sys.types'
     FROM sys.schemas AS s
-    JOIN sys.types AS t ON s.[schema_id]=t.[schema_id]
+    INNER JOIN sys.types AS t ON s.[schema_id]=t.[schema_id]
     WHERE t.is_user_defined=1
-   ;INSERT INTO @securables_temp (
-	parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, objectType , [objectTypeDescription]
-	)
+    UNION ALL
     -- XML_SCHEMA_COLLECTION
     SELECT 3 AS parent_class, x.[schema_id] AS parent_major_id, 10 AS class, x.xml_collection_id AS major_id, x.principal_id, 'XML SCHEMA COLLECTION' AS class_desc, N'XML SCHEMA COLLECTION::'+QUOTENAME(s.[name])+N'.'+QUOTENAME(x.[name]), 0 AS is_server_lvl
             , [objectType]='sys.xml_schema_collections'
             , [objectTypeDescription]='sys.xml_schema_collections'
     FROM sys.schemas AS s
-    JOIN sys.xml_schema_collections AS x ON s.[schema_id]=x.[schema_id]
- ;INSERT INTO @securables_temp (
-	parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, objectType , [objectTypeDescription]
-	)
+    INNER JOIN sys.xml_schema_collections AS x ON s.[schema_id]=x.[schema_id]
+    UNION ALL
     -- MESSAGE_TYPE
     SELECT 0 AS parent_class, 0 AS parent_major_id, 15 AS class, message_type_id AS major_id, principal_id, 'MESSAGE TYPE', N'MESSAGE TYPE::'+QUOTENAME([name]), 0 AS is_server_lvl
             , [objectType]='sys.service_message_types'
             , [objectTypeDescription]='sys.service_message_types'
     FROM sys.service_message_types
-  ;INSERT INTO @securables_temp (
-	parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, objectType , [objectTypeDescription]
-	)
+    UNION ALL
     -- SERVICE_CONTRACT
     SELECT 0 AS parent_class, 0 AS parent_major_id, 16 AS class, service_contract_id AS major_id, principal_id, 'SERVICE CONTRACT', N'SERVICE CONTRACT::'+QUOTENAME([name]), 0 AS is_server_lvl
             , [objectType]='sys.service_contracts'
             , [objectTypeDescription]='sys.service_contracts'
     FROM sys.service_contracts
-  ;INSERT INTO @securables_temp (
-	parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, objectType , [objectTypeDescription]
-	)
+    UNION ALL
     -- SERVICE
     SELECT 0 AS parent_class, 0 AS parent_major_id, 17 AS class, service_id AS major_id, principal_id, 'SERVICE', N'SERVICE::'+QUOTENAME([name]), 0 AS is_server_lvl
             , [objectType]='sys.services'
             , [objectTypeDescription]='sys.services'
     FROM sys.services
-  ;INSERT INTO @securables_temp (
-	parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, objectType , [objectTypeDescription]
-	)
+    UNION ALL
     -- REMOTE_SERVICE_BINDING
     SELECT 0 AS parent_class, 0 AS parent_major_id, 18 AS class, remote_service_binding_id AS major_id, principal_id, 'REMOTE SERVICE BINDING', N'REMOTE SERVICE BINDING::'+QUOTENAME([name]), 0 AS is_server_lvl
             , [objectType]='sys.remote_service_bindings'
             , [objectTypeDescription]='sys.remote_service_bindings'
     FROM sys.remote_service_bindings
-  ;INSERT INTO @securables_temp (
-	parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, objectType , [objectTypeDescription]
-	)
+    UNION ALL
     -- ROUTE
     SELECT 0 AS parent_class, 0 AS parent_major_id, 19 AS class, route_id AS major_id, principal_id, 'ROUTE', N'ROUTE::'+QUOTENAME([name]), 0 AS is_server_lvl
             , [objectType]= 'sys.routes'
             , [objectTypeDescription]= 'sys.routes'
     FROM sys.routes
-  ;INSERT INTO @securables_temp (
-	parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, objectType , [objectTypeDescription]
-	)
+    UNION ALL
     -- FULLTEXT CATALOG
     SELECT 0 AS parent_class, 0 AS parent_major_id, 23 AS class, fulltext_catalog_id AS major_id, principal_id, 'FULLTEXT CATALOG', N'CATALOG::'+QUOTENAME([name]), 0 AS is_server_lvl
             , [objectType]= 'sys.fulltext_catalogs'
             , [objectTypeDescription]= 'sys.fulltext_catalogs'
     FROM sys.fulltext_catalogs
-  ;INSERT INTO @securables_temp (
-	parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, objectType , [objectTypeDescription]
-	)
+    UNION ALL
     -- FULLTEXT STOPLIST
     SELECT 0 AS parent_class, 0 AS parent_major_id, 29 AS class, stoplist_id AS major_id, principal_id, 'FULLTEXT STOPLIST', N'STOPLIST::'+QUOTENAME([name]), 0 AS is_server_lvl
              , [objectType]= 'sys.fulltext_stoplists'
              , [objectTypeDescription]= 'sys.fulltext_stoplists'
     FROM sys.fulltext_stoplists
-  ;INSERT INTO @securables_temp (
-	parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, objectType , [objectTypeDescription]
-	)
+    UNION ALL
     -- SYMMETRIC KEY
     SELECT 0 AS parent_class, 0 AS parent_major_id, 24 AS class, symmetric_key_id AS major_id, principal_id, 'SYMMETRIC KEY', N'SYMMETRIC KEY::'+QUOTENAME([name]), 0 AS is_server_lvl
              , [objectType]= 'sys.symmetric_keys'
              , [objectTypeDescription]= 'sys.symmetric_keys'
     FROM sys.symmetric_keys
-  ;INSERT INTO @securables_temp (
-	parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, objectType , [objectTypeDescription]
-	)
+    UNION ALL
     -- CERTIFICATE
     SELECT 0 AS parent_class, 0 AS parent_major_id, 25 AS class, certificate_id AS major_id, principal_id, 'CERTIFICATE', N'CERTIFICATE::'+QUOTENAME([name]), 0 AS is_server_lvl
              , [objectType]= 'sys.certificates'
              , [objectTypeDescription]= 'sys.certificates'
     FROM sys.certificates
-  ;INSERT INTO @securables_temp (
-	parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, objectType , [objectTypeDescription]
-	)
+    UNION ALL
     -- ASYMMETRIC_KEY
     SELECT 0 AS parent_class, 0 AS parent_major_id, 26 AS class, asymmetric_key_id AS major_id, principal_id, 'ASYMMETRIC_KEY', N'ASYMMETRIC_KEY::'+QUOTENAME([name]), 0 AS is_server_lvl
              , [objectType]= 'sys.asymmetric_keys'
              , [objectTypeDescription]= 'sys.asymmetric_keys'
-    FROM sys.asymmetric_keys
+    FROM sys.asymmetric_keys)
+
+INSERT INTO @securables_temp (parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, objectType , [objectTypeDescription])
+SELECT parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, s.objectType,  s.[objectTypeDescription]
+FROM s;
+
 
 IF (@is_azure=0) BEGIN;
 
-    ;RAISERROR('Server-level and database-level securables that only work on-prem:',0,0) WITH NOWAIT
-    ;INSERT INTO @securables_temp (
-		parent_class
-		, parent_major_id
-		, class
-		, major_id
-		, principal_id
-		, class_desc
-		, qualified_name
-		, is_server_lvl
-		, objectType 
-		, [objectTypeDescription]
-		)
-    EXEC('SELECT 100 AS parent_class
-			, 0 AS parent_major_id
-			, 105 AS class
-			, endpoint_id AS major_id
-			, NULL AS principal_id
-			, ''ENDPOINT'' AS class_desc
-			, N''ENDPOINT::'' + QUOTENAME([name]) AS qualified_name
-			, 1 AS is_server_lvl
-			, [objectType]=''sys.endpoints''
-			, [objectTypeDescription]=''sys.endpoints''
-		FROM master.sys.endpoints');
+    --- Server-level and database-level securables that only work on-prem:
+    INSERT INTO @securables_temp (parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, objectType , [objectTypeDescription])
+    EXEC('
+    WITH s (parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, objectType, objectTypeDescription) 
+        AS (SELECT 100 AS parent_class, 0 AS parent_major_id, 105 AS class, endpoint_id AS major_id, NULL, ''ENDPOINT'', N''ENDPOINT::''+QUOTENAME([name]), 1 AS is_server_lvl
+                , [objectType]=''sys.endpoints''
+                , [objectTypeDescription]=''sys.endpoints''
+        FROM master.sys.endpoints)
+    SELECT parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, s.objectType,  s.[objectTypeDescription]
+    FROM s;
+    ');
+
 END;
 
 
-;RAISERROR('Build a hierarchy of @securables_temp, using a recursive CTE:',0,0) WITH NOWAIT
-;WITH cte AS (
+--- Build a hierarchy of @securables_temp, using a recursive CTE:
+WITH cte AS (
     SELECT class AS parent_class, major_id AS parent_major_id, ISNULL(qualified_name, N'SERVER') AS parent_qualified_name,
            class, class_desc, major_id, qualified_name, principal_id, is_server_lvl, 0 AS [level], CAST(ISNULL(qualified_name, 'SERVER') AS nvarchar(max)) AS [path]
            , s.objectType
@@ -825,8 +766,9 @@ END;
            , s.objectType
            , s.[objectTypeDescription]
     FROM cte
-    JOIN @securables_temp AS s ON cte.class=s.parent_class AND cte.major_id=s.parent_major_id)
---Eliminate duplicates and insert all parent-child paths into @securables:
+    INNER JOIN @securables_temp AS s ON cte.class=s.parent_class AND cte.major_id=s.parent_major_id)
+
+--- Eliminate duplicates and insert all parent-child paths into @securables:
 INSERT INTO @securables (parent_class, parent_major_id, parent_qualified_name, class, class_desc, major_id, qualified_name, principal_id, is_server_lvl, [path],objectType, [objectTypeDescription])
 SELECT parent_class, parent_major_id, parent_qualified_name, class, class_desc, major_id, qualified_name, principal_id, is_server_lvl, [path],objectType, [objectTypeDescription]
 FROM (
@@ -843,12 +785,12 @@ WHERE _rn=1;
 
 
 -------------------------------------------------------------------------------
-;RAISERROR('Rules (the intersection of principals, securables and permissions)',0,0) WITH NOWAIT
+--- Rules (the intersection of principals, securables and permissions)
 -------------------------------------------------------------------------------
 
 
 
-;RAISERROR('Explicit server-level permissions:',0,0) WITH NOWAIT
+--- Explicit server-level permissions:
 INSERT INTO @rules (class, class_desc, major_id, minor_id, grantee_principal_id, grantee_is_server_lvl, [permission_name], [state], state_desc, inheritance)
 SELECT class,
        class_desc,
@@ -862,7 +804,7 @@ SELECT class,
        CAST(NULL AS varchar(100)) AS inheritance
 FROM sys.server_permissions;
 
-;RAISERROR('Explicit database-level permissions:',0,0) WITH NOWAIT
+--- Explicit database-level permissions:
 INSERT INTO @rules (class, class_desc, major_id, minor_id, grantee_principal_id, grantee_is_server_lvl, [permission_name], [state], state_desc, inheritance)
 SELECT class,
        class_desc,
@@ -876,7 +818,7 @@ SELECT class,
        CAST(NULL AS varchar(100)) AS inheritance
 FROM sys.database_permissions;
 
-;RAISERROR('Implicit CONTROL permissions on class objects as a result of ownership:',0,0) WITH NOWAIT
+--- Implicit CONTROL permissions on class objects as a result of ownership:
 INSERT INTO @rules (class, class_desc, major_id, minor_id, grantee_principal_id, grantee_is_server_lvl, [permission_name], [state], state_desc, inheritance,objectType)
 SELECT class,
        class_desc,
@@ -892,7 +834,7 @@ SELECT class,
 FROM @securables
 WHERE parent_class=class AND parent_major_id=major_id AND principal_id IS NOT NULL;
 
-;RAISERROR('Fixed server role permissions:',0,0) WITH NOWAIT
+--- Fixed server role permissions:
 INSERT INTO @rules (class, class_desc, major_id, minor_id, grantee_principal_id, grantee_is_server_lvl, [permission_name], [state], state_desc, inheritance,[objectType])
 SELECT 100 AS class,
        N'SERVER' AS class_desc,
@@ -906,7 +848,7 @@ SELECT 100 AS class,
        NULL AS inheritance,
        [objectType]='sys.server_principals'
 FROM sys.server_principals AS sp
-JOIN sys.fn_builtin_permissions('SERVER') AS p ON
+INNER JOIN sys.fn_builtin_permissions('SERVER') AS p ON
       sp.[name]='bulkadmin' AND
       p.[permission_name]='ADMINISTER BULK OPERATIONS' OR
 
@@ -934,8 +876,8 @@ JOIN sys.fn_builtin_permissions('SERVER') AS p ON
       p.[permission_name]='ALTER ANY LINKED SERVER'
 WHERE sp.is_fixed_role=1;
 
-;RAISERROR('Fixed database role permissions:',0,0) WITH NOWAIT
-;INSERT INTO @rules (class, class_desc, major_id, minor_id, grantee_principal_id, grantee_is_server_lvl, [permission_name], [state], state_desc, inheritance, [objectType])
+--- Fixed database role permissions:
+INSERT INTO @rules (class, class_desc, major_id, minor_id, grantee_principal_id, grantee_is_server_lvl, [permission_name], [state], state_desc, inheritance, [objectType])
 SELECT 0 AS class,
        'DATABASE' AS class_desc,
        0 AS major_id,
@@ -951,7 +893,7 @@ FROM sys.database_principals AS dp
 CROSS JOIN (
     VALUES ('G', 'GRANT'),
            ('D', 'DENY')) AS s([state], state_desc)
-JOIN sys.fn_builtin_permissions('DATABASE') AS p ON
+INNER JOIN sys.fn_builtin_permissions('DATABASE') AS p ON
       dp.[name]='db_accessadmin' AND s.[state]='G' AND
       p.[permission_name] IN ('ALTER ANY USER', 'CREATE SCHEMA') OR
 
@@ -996,17 +938,17 @@ WHERE dp.[type]='R' AND
 
 
 -------------------------------------------------------------------------------
-;RAISERROR('Output:',0,0) WITH NOWAIT
+--- Output:
 -------------------------------------------------------------------------------
 
 
 
-;RAISERROR('If @output_xml=1, use the OUTPUT variable @xml to return a blob:',0,0) WITH NOWAIT
+--- If @output_xml=1, use the OUTPUT variable @xml to return a blob:
 IF (@output_xml=1)
     SELECT @xml=(
         SELECT perms.state_desc AS [@state],
 
-               --RROR(Permission hierarchy:
+               --- Permission hierarchy:
                (SELECT p.permission AS [@name],
                        p.class as [@class],
                        (CASE WHEN p.[level]=0 THEN 'declared' ELSE 'effective' END) AS [@inheritance]
@@ -1016,7 +958,7 @@ IF (@output_xml=1)
                 FOR XML PATH('permission'), TYPE
                 ) AS [permissions],
 
-               --RROR(Securables hierarchy:
+               --- Securables hierarchy:
                (SELECT sec.class_desc AS [@class],
                        sec.major_id AS [@major_id],
                        NULLIF(perms.minor_id, 0) AS [@minor_id],
@@ -1028,7 +970,7 @@ IF (@output_xml=1)
                 FOR XML PATH('securable'), TYPE
                 ) AS securables,
 
-               --RROR(Principals hierarchy:
+               --- Principals hierarchy:
                (SELECT grantee.effective_principal_id AS [@principal_id],
                        grantee.effective_type_desc AS [@type],
                        grantee.effective_name AS [@name],
@@ -1040,9 +982,9 @@ IF (@output_xml=1)
                 FOR XML PATH('principal'), TYPE
                 ) AS principals,
 
-               --RROR(The SQL statement of the declared permission:
+               --- The SQL statement of the declared permission:
                (CASE
-                     --RROR(Explicit GRANT/DENY:
+                     --- Explicit GRANT/DENY:
                      WHEN perms.inheritance IS NULL THEN
                        (CASE perms.[state] WHEN 'W' THEN N'GRANT' ELSE perms.state_desc END)+
                              N' '+perms.[permission_name] COLLATE database_default+
@@ -1050,22 +992,22 @@ IF (@output_xml=1)
                              N' TO '+QUOTENAME(def_grantee.declared_name)+
                              (CASE WHEN perms.[state]='W' THEN N' WITH GRANT OPTION' ELSE N'' END)
 
-                     --RROR(Inferred CONTROL by ownership: ALTER AUTHORIZATION
+                     --- Inferred CONTROL by ownership: ALTER AUTHORIZATION
                      WHEN perms.inheritance='OWNER' THEN
                        N'ALTER AUTHORIZATION '+
                        ISNULL(N' ON '+def_sec.parent_qualified_name, N'')+
                        N' TO '+QUOTENAME(def_grantee.declared_name) COLLATE database_default
                      END) AS [declared_permission/@sql]
         FROM @rules AS perms
-        JOIN @principals AS def_grantee ON
+        INNER JOIN @principals AS def_grantee ON
             def_grantee.declared_is_server_lvl=perms.grantee_is_server_lvl AND
             def_grantee.declared_principal_id=perms.grantee_principal_id AND
             def_grantee.[level]=0
-        JOIN @permissions AS def_p ON
+        INNER JOIN @permissions AS def_p ON
             perms.class_desc COLLATE database_default=(CASE WHEN def_p.declared_class IN (N'USER', N'ROLE') THEN N'DATABASE_PRINCIPAL' ELSE def_p.declared_class END) AND
             perms.[permission_name] COLLATE database_default=def_p.declared_permission AND
             def_p.[level]=0
-        JOIN @securables AS def_sec ON
+        INNER JOIN @securables AS def_sec ON
             perms.class=def_sec.parent_class AND
             perms.major_id=def_sec.parent_major_id AND
             def_p.class=def_sec.class_desc AND
@@ -1081,16 +1023,16 @@ IF (@output_xml=1)
               (@permission IS NULL OR perms.[permission_name] LIKE @permission)
         FOR XML PATH('permission'), TYPE);
 
-;RAISERROR('If @output_xml=0, return a tabular resultset with all inherited permutations:',0,0)with nowait
+--- If @output_xml=0, return a tabular resultset with all inherited permutations:
 IF (@output_xml=0)
     SELECT perms.state_desc AS [state],
            perms.[permission_name] AS permission,
            sec.parent_qualified_name AS securable,
            grantee.declared_name AS principal,
 
-           --RROR(The SQL statement of the declared permission:
+           --- The SQL statement of the declared permission:
            (CASE
-                 --RROR(Explicit GRANT/DENY:
+                 --- Explicit GRANT/DENY:
                  WHEN perms.inheritance IS NULL THEN
                    (CASE perms.[state] WHEN 'W' THEN N'GRANT' ELSE perms.state_desc END)+
                          N' '+perms.[permission_name] COLLATE database_default+
@@ -1098,20 +1040,20 @@ IF (@output_xml=0)
                          N' TO '+QUOTENAME(grantee.declared_name)+
                          (CASE WHEN perms.[state]='W' THEN N' WITH GRANT OPTION' ELSE N'' END)
 
-                 --RROR(Inferred CONTROL by ownership: ALTER AUTHORIZATION
+                 --- Inferred CONTROL by ownership: ALTER AUTHORIZATION
                  WHEN perms.inheritance='OWNER' THEN
                    N'ALTER AUTHORIZATION '+
                    ISNULL(N' ON '+sec.parent_qualified_name, N'')+
                    N' TO '+QUOTENAME(grantee.declared_name) COLLATE database_default
                  END) AS declared_permission,
 
-           --RROR(Effective permissions:
+           --- Effective permissions:
            (CASE MIN((CASE WHEN [state]='D' THEN 0 ELSE 1 END)) OVER (PARTITION BY sec.class, sec.major_id, perms.minor_id, p.permission) WHEN 0 THEN N'DENY' ELSE N'GRANT' END) AS effective_state,
            p.permission AS effective_permission,
            sec.qualified_name AS effective_securable,
            grantee.effective_name AS effective_principal,
 
-           --RROR(Paths (the explanation for the effective permissions)
+           --- Paths (the explanation for the effective permissions)
            p.[path] AS permission_path,
            sec.[path] AS securable_path,
            grantee.[path] AS principal_path,
@@ -1128,7 +1070,7 @@ IF (@output_xml=0)
 
     FROM @rules AS perms
 
-    JOIN @principals AS grantee ON
+    INNER JOIN @principals AS grantee ON
         grantee.declared_is_server_lvl=perms.grantee_is_server_lvl AND
         grantee.declared_principal_id=perms.grantee_principal_id
 
@@ -1138,13 +1080,13 @@ IF (@output_xml=0)
         perms.major_id=col.[object_id] AND
         perms.minor_id=col.column_id
 
-    JOIN @permissions AS p ON
+    INNER JOIN @permissions AS p ON
         perms.class_desc COLLATE database_default=(CASE WHEN p.declared_class IN (N'USER', N'ROLE') THEN N'DATABASE_PRINCIPAL' ELSE p.declared_class END) AND
         perms.[permission_name] COLLATE database_default=p.declared_permission AND
         (   p.class IN ('SERVER', 'SERVER_PRINCIPAL', 'ENDPOINT') AND grantee.effective_is_server_lvl=1 OR
             p.class NOT IN ('SERVER', 'SERVER_PRINCIPAL', 'ENDPOINT') AND grantee.effective_is_server_lvl=0)
 
-    JOIN @securables AS sec ON
+    INNER JOIN @securables AS sec ON
         perms.class=sec.parent_class AND
         perms.major_id=sec.parent_major_id AND
         p.class=sec.class_desc
@@ -1167,11 +1109,9 @@ IF (@output_xml=0)
              p.permission,
              sec.qualified_name,
              grantee.effective_name;
-END TRY
-BEGIN CATCH
-	;THROW;
-END CATCH
+END
 GO
+
 
 --- This marks master.dbo.sp_help_permissions as a "system object", which makes
 --- it accessible from any database without the "master." prefix. It
@@ -1180,7 +1120,8 @@ GO
 ---
 --- Not available on Azure SQL Database.
 ---
---- NOTE: sp_MS_marksystemobject is an undocumented, unsupported feature of SQL Server.
+--- NOTE: sp_MS_marksystemobject is an undocumented, unsupported
+---       feature of SQL Server.
 
 IF (DB_NAME()='master' AND CAST(SERVERPROPERTY('Edition') AS varchar(100)) NOT LIKE '%Azure%')
 	EXECUTE sys.sp_MS_marksystemobject @objname=N'[dbo].[sp_help_permissions]';
