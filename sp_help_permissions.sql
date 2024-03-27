@@ -38,7 +38,7 @@ ALTER PROCEDURE dbo.sp_help_permissions
     @xml                        xml=NULL OUTPUT
 WITH EXECUTE AS CALLER
 AS
-
+BEGIN
 SET NOCOUNT ON;
 SET STATISTICS XML, TIME, IO OFF;
 SET DEADLOCK_PRIORITY LOW;
@@ -605,9 +605,9 @@ AS (
     WHERE agr.replica_metadata_id IS NOT NULL   -- temporary workaround to fix NULL values in major_id (replica_metadata_id)
     UNION ALL
     -- LOGIN, SERVER ROLE
-    SELECT 100 AS parent_class, 0 AS parent_major_id, 101 AS class, principal_id AS major_id, owning_principal_id,
-           (CASE [type] WHEN 'R' THEN N'SERVER ROLE' ELSE N'LOGIN' END),
-           (CASE [type] WHEN 'R' THEN N'SERVER ROLE' ELSE N'LOGIN' END)+N'::'+QUOTENAME([name]), 1 AS is_server_lvl
+    SELECT 100 AS parent_class, 0 AS parent_major_id, 101 AS class, principal_id AS major_id, NULL AS owning_principal_id,
+           (CASE [type_desc] WHEN 'R' THEN N'SERVER ROLE' ELSE N'LOGIN' END),
+           (CASE [type_desc] WHEN 'R' THEN N'SERVER ROLE' ELSE N'LOGIN' END)+N'::'+QUOTENAME([name]), 1 AS is_server_lvl
            , [objectType]='sys.server_principals'
            , [objectTypeDescription]='sys.server_principals'
     FROM @srv_principals
@@ -740,12 +740,10 @@ IF (@is_azure=0) BEGIN;
     INSERT INTO @securables_temp (parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, objectType , [objectTypeDescription])
     EXEC('
     WITH s (parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, objectType, objectTypeDescription) 
-        -- ENDPOINT
-        SELECT 100 AS parent_class, 0 AS parent_major_id, 105 AS class, endpoint_id AS major_id, NULL, ''ENDPOINT'', N''ENDPOINT::''+QUOTENAME([name]), 1 AS is_server_lvl
+        AS (SELECT 100 AS parent_class, 0 AS parent_major_id, 105 AS class, endpoint_id AS major_id, NULL, ''ENDPOINT'', N''ENDPOINT::''+QUOTENAME([name]), 1 AS is_server_lvl
                 , [objectType]=''sys.endpoints''
                 , [objectTypeDescription]=''sys.endpoints''
         FROM master.sys.endpoints)
-
     SELECT parent_class, parent_major_id, class, major_id, principal_id, class_desc, qualified_name, is_server_lvl, s.objectType,  s.[objectTypeDescription]
     FROM s;
     ');
@@ -1111,8 +1109,7 @@ IF (@output_xml=0)
              p.permission,
              sec.qualified_name,
              grantee.effective_name;
-
-
+END
 GO
 
 
